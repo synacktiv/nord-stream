@@ -14,7 +14,7 @@ $ pip3 install -r requirements.txt
 
 ## Usage
 
-cf #FIXME lien vers l'article
+More information in our article: https://www.synacktiv.com/publications/cicd-secrets-extraction-tips-and-tricks
 
 By default, the tool will attempt to extract all secrets from all accessible projects or repositories. Several options are available to restrict the extraction of secrets.
 
