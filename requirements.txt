@@ -1,0 +1,4 @@
+docopt
+PyYAML
+requests
+rich
