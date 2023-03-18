@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --env <env> --disable-protections --write-filter --branch-name <name>]
+    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
@@ -29,6 +29,7 @@ args
     --env <env>                             Specify env for the yaml file creation.
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
+    --no-org                                Don't extract organization secrets.
     --exploit-oidc                          Generate an access token for a cloud provider using an existing OIDC trust between a cloud role and a GitHub workflow (supports only Azure for now).
     --azure-tenant-id <tenant>              Identifier of the Azure tenant associated with the application having federated credentials.
     --azure-subscription-id <subscription>  Identifier of the Azure subscription associated with the application having federated credentials.
@@ -84,6 +85,8 @@ def start(argv):
         gitHubWorkflowRunner.extractRepo = not args["--no-repo"]
     if args["--no-env"]:
         gitHubWorkflowRunner.extractEnv = not args["--no-env"]
+    if args["--no-org"]:
+        gitHubWorkflowRunner.extractOrg = not args["--no-org"]
     if args["--yaml"]:
         gitHubWorkflowRunner.yaml = args["--yaml"]
     if args["--disable-protections"]:

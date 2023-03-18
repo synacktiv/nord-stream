@@ -16,6 +16,7 @@ class GitHubWorkflowRunner:
     _env = None
     _extractRepo = True
     _extractEnv = True
+    _extractOrg = True
     _yaml = None
     _exploitOIDC = False
     _tenantId = None
@@ -47,6 +48,14 @@ class GitHubWorkflowRunner:
     @extractEnv.setter
     def extractEnv(self, value):
         self._extractEnv = value
+
+    @property
+    def extractOrg(self):
+        return self._extractOrg
+
+    @extractOrg.setter
+    def extractOrg(self, value):
+        self._extractOrg = value
 
     @property
     def workflowFilename(self):
@@ -201,7 +210,10 @@ class GitHubWorkflowRunner:
         secrets = []
 
         try:
-            secrets = self._cicd.listSecretsFromRepo(repo)
+            if self._extractRepo:
+                secrets += self._cicd.listSecretsFromRepo(repo)
+            if self._extractOrg:
+                secrets += self._cicd.listOrganizationSecretsFromRepo(repo)
         except GitHubError as e:
             logger.error(e)
 
@@ -311,6 +323,7 @@ class GitHubWorkflowRunner:
             try:
                 self.__displayRepoSecrets(repo)
                 self.__displayEnvSecrets(repo)
+                self.__displayOrgSecrets(repo)
             except Exception:
                 logger.error("Need write acccess on the repo.")
 
@@ -329,6 +342,13 @@ class GitHubWorkflowRunner:
                 logger.info(f"{env} secrets:")
                 for secret in secrets:
                     logger.raw(f"\t- {secret}\n", logging.INFO)
+
+    def __displayOrgSecrets(self, repo):
+        secrets = self._cicd.listOrganizationSecretsFromRepo(repo)
+        if len(secrets) != 0:
+            logger.info("Repository organization secrets:")
+            for secret in secrets:
+                logger.raw(f"\t- {secret}\n", logging.INFO)
 
     def getRepos(self, repo):
         if repo:
@@ -416,7 +436,7 @@ class GitHubWorkflowRunner:
             logger.empty_line()
 
     def __runSecretsExtractionWorkflow(self, repo):
-        if self._extractRepo:
+        if self._extractRepo or self._extractOrg:
             self.__extractSecretsFromRepo(repo)
 
         if self._extractEnv:

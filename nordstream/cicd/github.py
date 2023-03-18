@@ -164,6 +164,21 @@ class GitHub:
             raise GitHubError(response.get("message"))
         return res
 
+    def listOrganizationSecretsFromRepo(self, repo):
+        res = []
+        response = self._session.get(
+            f"{self._repoURL}/{repo}/actions/organization-secrets",
+            auth=self._auth,
+            headers=self._header,
+        ).json()
+
+        if response.get("total_count", 0) >= 0:
+            for sec in response.get("secrets"):
+                res.append(sec.get("name"))
+        else:
+            raise GitHubError(response.get("message"))
+        return res
+
     def listEnvProtections(self, repo, env):
         logger.debug("Getting environment protections")
         envReq = urllib.parse.quote(env, safe="")
