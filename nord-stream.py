@@ -8,6 +8,7 @@ Usage:
 Commands
     github                                  command related to GitHub.
     devops                                  command related to Azure DevOps.
+    gitlab                                  command related to GitLab.
 
 Options:
     -h --help                               Show this screen.
@@ -33,5 +34,9 @@ if __name__ == "__main__":
         import nordstream.commands.devops as devops
 
         devops.start(argv)
+    elif args["<command>"] == "gitlab":
+        import nordstream.commands.gitlab as gitlab
+
+        gitlab.start(argv)
     else:
         logger.error(f"{args['<command>']} is not a nord-stream.py command.")
