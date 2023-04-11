@@ -143,7 +143,7 @@ class GitHub:
         ).json()
 
         if response.get("total_count", 0) >= 0:
-            for sec in response.get("secrets"):
+            for sec in response.get("secrets") or []:
                 res.append(sec.get("name"))
         else:
             raise GitHubError(response.get("message"))
@@ -158,22 +158,7 @@ class GitHub:
         ).json()
 
         if response.get("total_count", 0) >= 0:
-            for sec in response.get("secrets"):
-                res.append(sec.get("name"))
-        else:
-            raise GitHubError(response.get("message"))
-        return res
-
-    def listOrganizationSecretsFromRepo(self, repo):
-        res = []
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/actions/organization-secrets",
-            auth=self._auth,
-            headers=self._header,
-        ).json()
-
-        if response.get("total_count", 0) >= 0:
-            for sec in response.get("secrets"):
+            for sec in response.get("secrets") or []:
                 res.append(sec.get("name"))
         else:
             raise GitHubError(response.get("message"))
