@@ -15,7 +15,12 @@ CLEAN_COMMIT_MSG = "Remove test deployment"
 
 def gitRunCommand(command):
     try:
-        subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # debug level
+        if logger.level <= 10:
+            logger.debug(f"Running: {command}")
+            subprocess.run(command, shell=True, check=True)
+        else:
+            subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         return False
     return True
@@ -23,6 +28,12 @@ def gitRunCommand(command):
 
 def gitInitialization(branch, branchAlreadyExists=False):
     logger.verbose("Git init")
+
+    if not gitIsGloalUserConfigured():
+        gitRunCommand("git config --global user.Name test")
+
+    if not gitIsGloalEmailConfigured():
+        gitRunCommand("git config --global user.email test@test.com")
 
     if branchAlreadyExists:
         gitRunCommand(f"git checkout {branch}")
@@ -106,3 +117,31 @@ def gitGetCurrentBranch():
         .communicate()[0]
         .decode("UTF-8")
     )
+
+
+def gitIsGloalUserConfigured():
+    res = subprocess.Popen(
+        "git config --global user.Name",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    res.wait()
+    if res.returncode != 0:
+        return False
+
+    return True
+
+
+def gitIsGloalEmailConfigured():
+    res = subprocess.Popen(
+        "git config --global user.email",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    res.wait()
+    if res.returncode != 0:
+        return False
+
+    return True
