@@ -1,5 +1,6 @@
 import requests
 from nordstream.utils.log import logger
+from nordstream.utils.errors import GitLabError
 
 
 class GitLab:
@@ -67,6 +68,8 @@ class GitLab:
             for variable in response.json():
                 # print(variable['key'], variable['value'], variable['protected'])
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+        elif response.status_code == 403:
+            raise GitLabError(response.json().get("message"))
         return res
 
     def addProject(self, project=None):
