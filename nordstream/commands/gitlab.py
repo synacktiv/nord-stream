@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> --org <org> [--project <project>]
+    nord-stream.py gitlab [options] --token <pat> [--url <gitlab_url>] [--project <project>]
 
 Options:
     -h --help                               Show this screen.
@@ -12,6 +12,8 @@ Options:
 
 args
     --token <pat>                           GitLab personal token
+    --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
+    --project <project>                     Run on selected project (can be a file)
     --list-secrets                          List all secrets.
     --list-projects                         List all projects.
 """
@@ -33,11 +35,11 @@ def start(argv):
     logger.debug(args)
 
     # check validity of the token
-    if not GitLab.checkToken(args["--token"]):
+    if not GitLab.checkToken(args["--token"], args["--url"]):
         logger.critical("Invalid token")
 
     # gitlab setup
-    gitlab = GitLab(args["--token"], args["--org"])
+    gitlab = GitLab(args["--url"], args["--token"])
     gitLabRunner = GitLabRunner(gitlab)
 
     gitLabRunner.getProjects(args["--project"])

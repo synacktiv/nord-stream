@@ -12,15 +12,15 @@ class GitLabRunner:
 
     def getProjects(self, project):
         if project:
-            logger.info("TODO")
-            # # if repo is a file, read it
-            # if exists(project):
-            #     with open(project, "r") as file:
-            #         for project in file:
-            #             #TODO
-            #             # self._cicd.addProject(project.strip())
+            if exists(project):
+                with open(project, "r") as file:
+                    for p in file:
+                        self._cicd.addProject(p.strip())
+
+            else:
+                self._cicd.addProject(project)
         else:
-            self._cicd.listProjects()
+            self._cicd.addProject()
 
     def listGitLabSecrets(self):
         logger.info("Listing GitLab secrets")
@@ -44,7 +44,7 @@ class GitLabRunner:
     def listGitLabProjects(self):
         logger.info("Listing GitLab projects")
         for project in self._cicd.projects:
-            logger.raw(f'- {project["name"]}\n', level=logging.INFO)
+            logger.raw(f'- {project["path_with_namespace"]}\n', level=logging.INFO)
 
     def runPipeline(self):
         # TODO
