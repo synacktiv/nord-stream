@@ -14,7 +14,6 @@ class GitLab:
     _header = None
     _gitlabURL = None
     _verifyCert = True
-    # _header = {"Accept": "application/vnd.github+json"}
 
     def __init__(self, url, token):
         self._gitlabURL = url.strip("/")
@@ -83,9 +82,7 @@ class GitLab:
 
             f = open(f"{path}/secrets.txt", "w")
 
-            # logger.debug(response.json())
             for variable in response.json():
-                # print(variable['key'], variable['value'], variable['protected'])
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
@@ -109,9 +106,7 @@ class GitLab:
 
             f = open(f"{path}/secrets.txt", "w")
 
-            # logger.debug(response.json())
             for variable in response.json():
-                # print(variable['key'], variable['value'], variable['protected'])
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
@@ -134,9 +129,7 @@ class GitLab:
 
             f = open(f"{path}/secrets.txt", "w")
 
-            # logger.debug(response.json())
             for variable in response.json():
-                # print(variable['key'], variable['value'], variable['protected'])
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
