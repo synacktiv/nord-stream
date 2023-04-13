@@ -9,6 +9,7 @@ class GitLab:
     _session = None
     _token = None
     _projects = []
+    _groups = []
     _outputDir = "nord-stream-logs"
     _header = None
     _gitlabURL = None
@@ -25,6 +26,10 @@ class GitLab:
     @property
     def projects(self):
         return self._projects
+
+    @property
+    def groups(self):
+        return self._groups
 
     @property
     def token(self):
@@ -90,6 +95,57 @@ class GitLab:
             raise GitLabError(response.json().get("message"))
         return res
 
+    def listVariablesFromGroup(self, group):
+        id = group.get("id")
+        res = []
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/groups/{id}/variables",
+            headers=self._header,
+            verify=self._verifyCert,
+        )
+        if response.status_code == 200:
+
+            path = self.__createOutputDir(group.get("full_path"))
+
+            f = open(f"{path}/secrets.txt", "w")
+
+            # logger.debug(response.json())
+            for variable in response.json():
+                # print(variable['key'], variable['value'], variable['protected'])
+                res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+
+                f.write(f"{variable['key']}={variable['value']}\n")
+
+            f.close()
+        elif response.status_code == 403:
+            raise GitLabError(response.json().get("message"))
+        return res
+
+    def listVariablesFromInstance(self):
+        res = []
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/admin/ci/variables",
+            headers=self._header,
+            verify=self._verifyCert,
+        )
+        if response.status_code == 200:
+
+            path = self.__createOutputDir("")
+
+            f = open(f"{path}/secrets.txt", "w")
+
+            # logger.debug(response.json())
+            for variable in response.json():
+                # print(variable['key'], variable['value'], variable['protected'])
+                res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+
+                f.write(f"{variable['key']}={variable['value']}\n")
+
+            f.close()
+        elif response.status_code == 403:
+            raise GitLabError(response.json().get("message"))
+        return res
+
     def addProject(self, project=None, filterWrite=False):
         logger.debug(f"Checking project: {project}")
 
@@ -131,8 +187,43 @@ class GitLab:
                 logger.error("Error while retrieving projects")
                 logger.debug(response.json())
 
-    def __createOutputDir(self, project):
-        outputName = project.replace("/", "_")
-        path = f"{self._outputDir}/{outputName}"
+    def addGroups(self, group=None):
+        logger.debug(f"Checking group: {group}")
+
+        i = 1
+        while True:
+
+            params = {"per_page": 100, "page": i, "all_available": True}
+
+            if group != None:
+                params["search_namespaces"] = True
+                params["search"] = project
+
+            response = self._session.get(
+                f"{self._gitlabURL}/api/v4/groups",
+                headers=self._header,
+                params=params,
+                verify=self._verifyCert,
+            )
+
+            if response.status_code == 200:
+                if len(response.json()) == 0:
+                    break
+
+                for p in response.json():
+                    p = {
+                        "id": p.get("id"),
+                        "full_path": p.get("full_path"),
+                        "name": p.get("name"),
+                    }
+                    self._groups.append(p)
+                i += 1
+            else:
+                logger.error("Error while retrieving groups")
+                logger.debug(response.json())
+
+    def __createOutputDir(self, name):
+        # outputName = name.replace("/", "_")
+        path = f"{self._outputDir}/{name}"
         makedirs(path, exist_ok=True)
         return path
