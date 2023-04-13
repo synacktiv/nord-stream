@@ -1,10 +1,14 @@
 import requests
+import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 
+COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
+
 
 class GitLab:
+    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu"
     _auth = None
     _session = None
     _token = None
@@ -14,6 +18,10 @@ class GitLab:
     _header = None
     _gitlabURL = None
     _verifyCert = True
+    _branchName = _DEFAULT_BRANCH_NAME
+    _sleepTime = 15
+    _sleepTimeOutput = 6
+    _maxRetry = 10
 
     def __init__(self, url, token):
         self._gitlabURL = url.strip("/")
@@ -36,7 +44,7 @@ class GitLab:
 
     @property
     def url(self):
-        return self._url
+        return self._gitlabURL
 
     @property
     def outputDir(self):
@@ -45,6 +53,18 @@ class GitLab:
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
+
+    @property
+    def defaultBranchName(self):
+        return self._DEFAULT_BRANCH_NAME
+
+    @property
+    def branchName(self):
+        return self._branchName
+
+    @branchName.setter
+    def branchName(self, value):
+        self._branchName = value
 
     @classmethod
     def checkToken(cls, token, gitlabURL):
@@ -139,7 +159,7 @@ class GitLab:
             raise GitLabError(response.json().get("message"))
         return res
 
-    def addProject(self, project=None, filterWrite=False):
+    def addProject(self, project=None, filterWrite=False, strict=False):
         logger.debug(f"Checking project: {project}")
 
         # username = self.retieveUsernameFromToken()
@@ -169,6 +189,8 @@ class GitLab:
                     break
 
                 for p in response.json():
+                    if strict and p.get("path_with_namespace") != project:
+                        continue
                     p = {
                         "id": p.get("id"),
                         "path_with_namespace": p.get("path_with_namespace"),
@@ -220,3 +242,101 @@ class GitLab:
         path = f"{self._outputDir}/{name}"
         makedirs(path, exist_ok=True)
         return path
+
+    def waitPipeline(self, projectId):
+        logger.info("Getting pipeline output")
+
+        time.sleep(5)
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+            headers=self._header,
+            verify=self._verifyCert,
+        ).json()
+
+        if response[0].get("status") not in COMPLETED_STATES:
+            for i in range(self._maxRetry):
+                logger.warning(f"Pipeline still running, sleeping for {self._sleepTime}s")
+                time.sleep(self._sleepTime)
+
+                response = self._session.get(
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+                    headers=self._header,
+                    verify=self._verifyCert,
+                ).json()
+
+                if response[0].get("status") in COMPLETED_STATES:
+                    break
+                if i == (self._maxRetry - 1):
+                    logger.error("Error: pipeline still not finished.")
+
+        return (
+            response[0].get("id"),
+            response[0].get("status"),
+        )
+
+    def __getJobId(self, projectId, pipelineId):
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}/jobs",
+            headers=self._header,
+            verify=self._verifyCert,
+        ).json()
+
+        return response[0].get("id")
+
+    def downloadPipelineOutput(self, project, pipelineId):
+        projectPath = project.get("path_with_namespace")
+        self.__createOutputDir(projectPath)
+
+        projectId = project.get("id")
+
+        jobId = self.__getJobId(projectId)
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
+            headers=self._header,
+            verify=self._verifyCert,
+        )
+
+        if response.status_code != 200:
+            for i in range(self._maxRetry):
+                logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
+                time.sleep(self._sleepTimeOutput)
+                response = self._session.get(
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
+                    headers=self._header,
+                    verify=self._verifyCert,
+                )
+                if response.status_code == 200:
+                    break
+                if i == (self._maxRetry - 1):
+                    logger.error("Output still no ready, error !")
+                    return None
+
+        date = time.strftime("%Y-%m-%d_%H-%M-%S")
+        with open(f"{self._outputDir}/{projectPath}/pipeline_{date}.log", "w") as f:
+            f.write(response.text)
+        f.close()
+        return f"pipeline_{date}.log"
+
+    def __deletePipelines(self, projectId):
+        logger.debug("Deleting pipeline")
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+            headers=self._header,
+            verify=self._verifyCert,
+        ).json()
+
+        for pipeline in response:
+
+            pipelineId = pipeline.get("id")
+            response = self._session.delete(
+                f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}",
+                headers=self._header,
+                verify=self._verifyCert,
+            )
+
+    def cleanAllLogs(self, projectId):
+        self.__deletePipelines(projectId)

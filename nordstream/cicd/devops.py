@@ -427,6 +427,7 @@ class DevOps:
         with open(f"{self._outputDir}/{self._org}/{projectId}/pipeline_{date}.log", "w") as f:
             for line in logOutput.get("value"):
                 f.write(line + "\n")
+        f.close()
         return f"pipeline_{date}.log"
 
     def __cleanRunLogs(self, projectId):

@@ -4,6 +4,8 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py gitlab [options] --token <pat> --list-secrets [--project <project> --group <group> --no-project --no-group --no-instance]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--write-filter]
+    nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
 
 Options:
     -h --help                               Show this screen.
@@ -23,6 +25,10 @@ args
     --no-project                            Don't extract project secrets.
     --no-group                              Don't extract group secrets.
     --no-instance                           Don't extract instance secrets.
+    -y, --yaml <yaml>                       Run arbitrary job
+    --branch-name <name>                    Use specific branch name for deployment.
+    --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
+    --no-clean                              Don't clean pipeline logs (default false)
 """
 
 from docopt import docopt
@@ -49,6 +55,10 @@ def start(argv):
     gitlab = GitLab(args["--url"], args["--token"])
     gitLabRunner = GitLabRunner(gitlab)
 
+    if args["--branch-name"]:
+        gitlab.branchName = args["--branch-name"]
+        logger.info(f'Using branch: "{gitlab.branchName}"')
+
     # config
     if args["--write-filter"]:
         gitLabRunner.writeAccessFilter = args["--write-filter"]
@@ -58,6 +68,10 @@ def start(argv):
         gitLabRunner.extractGroup = not args["--no-group"]
     if args["--no-instance"]:
         gitLabRunner.extractinstance = not args["--no-instance"]
+    if args["--no-clean"]:
+        gitLabRunner.cleanLogs = not args["--no-clean"]
+    if args["--yaml"]:
+        gitLabRunner.yaml = args["--yaml"]
 
     # logic
     if args["--list-projects"]:
@@ -76,5 +90,10 @@ def start(argv):
 
         gitLabRunner.listGitLabSecrets()
 
+    elif args["--clean-logs"]:
+        gitLabRunner.getProjects(args["--project"])
+        gitLabRunner.manualCleanLogs()
+
     else:
+        gitLabRunner.getProjects(args["--project"], strict=True)
         gitLabRunner.runPipeline()

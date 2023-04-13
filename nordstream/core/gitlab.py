@@ -1,9 +1,11 @@
 import logging
 
+from urllib.parse import urlparse
 from os import makedirs, chdir
 from os.path import exists, realpath
 from nordstream.git import *
 from nordstream.utils.errors import GitLabError
+from nordstream.yaml.gitlab import GitLabPipelineGenerator
 
 
 class GitLabRunner:
@@ -12,6 +14,10 @@ class GitLabRunner:
     _extractProject = True
     _extractGroup = True
     _extractInstance = True
+    _yaml = None
+    _branchAlreadyExists = False
+    _fileName = None
+    _cleanLogs = True
 
     @property
     def writeAccessFilter(self):
@@ -45,6 +51,30 @@ class GitLabRunner:
     def extractInstance(self, value):
         self._extractInstance = value
 
+    @property
+    def yaml(self):
+        return self._yaml
+
+    @yaml.setter
+    def yaml(self, value):
+        self._yaml = value
+
+    @property
+    def branchAlreadyExists(self):
+        return self._branchAlreadyExists
+
+    @branchAlreadyExists.setter
+    def branchAlreadyExists(self, value):
+        self._branchAlreadyExists = value
+
+    @property
+    def cleanLogs(self):
+        return self._cleanLogs
+
+    @cleanLogs.setter
+    def cleanLogs(self, value):
+        self._cleanLogs = value
+
     def __init__(self, cicd):
         self._cicd = cicd
         self.__createLogDir()
@@ -53,15 +83,15 @@ class GitLabRunner:
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/gitlab"
         makedirs(self._cicd.outputDir, exist_ok=True)
 
-    def getProjects(self, project):
+    def getProjects(self, project, strict=False):
         if project:
             if exists(project):
                 with open(project, "r") as file:
                     for p in file:
-                        self._cicd.addProject(project=p.strip(), filterWrite=self._writeAccessFilter)
+                        self._cicd.addProject(project=p.strip(), filterWrite=self._writeAccessFilter, strict=strict)
 
             else:
-                self._cicd.addProject(project=project, filterWrite=self._writeAccessFilter)
+                self._cicd.addProject(project=project, filterWrite=self._writeAccessFilter, strict=strict)
         else:
             self._cicd.addProject(filterWrite=self._writeAccessFilter)
 
@@ -87,7 +117,7 @@ class GitLabRunner:
         logger.info("Listing GitLab secrets")
 
         if self._extractInstance:
-            self.__displayInstanceVariables()
+            self.__listGitLabInstanceSecrets()
 
         if self._extractGroup:
             self.__listGitLabGroupSecrets()
@@ -115,7 +145,7 @@ class GitLabRunner:
 
     def __listGitLabInstanceSecrets(self):
         try:
-            logger.info(f"Instance secrets")
+            logger.info("Instance secrets")
             self.__displayInstanceVariables()
         except Exception as e:
             logger.error(f"Error while listing instance secrets: {e}")
@@ -173,5 +203,132 @@ class GitLabRunner:
             logger.raw(f'- {project["full_path"]}\n', level=logging.INFO)
 
     def runPipeline(self):
-        # TODO
-        logger.debug("TODO")
+        for project in self._cicd.projects:
+
+            repoShortName = project.get("name")
+
+            logger.success(f'"{repoShortName}"')
+
+            domain = urlparse(self._cicd.url).netloc
+            url = f"https://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
+            gitClone(url)
+
+            chdir(repoShortName)
+            self._pushedCommitsCount = 0
+            self._branchAlreadyExists = gitRemoteBranchExists(self._cicd.branchName)
+            gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+
+            try:
+                # TODO: branch protections
+                # if not self._forceDeploy:
+                #    self.__checkAndDisableBranchProtectionRules(repo)
+
+                if self._yaml:
+                    self.__runCustomPipeline(project)
+                else:
+                    logger.error("No yaml specify")
+
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                if logger.getEffectiveLevel() == logging.DEBUG:
+                    logger.exception(e)
+
+            finally:
+                self.__clean(project)
+                chdir("../")
+                subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
+
+        logger.info(f"Check output: {self._cicd.outputDir}")
+
+    def __runCustomPipeline(self, project):
+        logger.info(f"Running custom pipeline: {self._yaml}")
+
+        pipelineGenerator = GitLabPipelineGenerator()
+        pipelineGenerator.loadFile(self._yaml)
+
+        try:
+            pipelineId = self.__launchPipeline(project, pipelineGenerator)
+            if pipelineId:
+                self._fileName = self._cicd.downloadPipelineOutput(project, pipelineId)
+                if self._fileName:
+                    self.__extractPipelineOutput(project)
+
+                logger.empty_line()
+        except Exception as e:
+            logger.error(f"Error: {e}")
+
+        finally:
+            logger.empty_line()
+
+    def __launchPipeline(self, project, pipelineGenerator):
+        logger.verbose(f"Launching pipeline.")
+
+        projectId = project.get("id")
+
+        pipelineGenerator.writeFile(f".gitlab-ci.yml")
+        pushOutput = gitPush(self._cicd.branchName)
+        pushOutput.wait()
+
+        try:
+            if pushOutput.returncode != 0 or b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+                logger.error("Error when pushing code:")
+                logger.raw(pushOutput.communicate()[1], logging.INFO)
+            else:
+                self._pushedCommitsCount += 1
+                logger.raw(pushOutput.communicate()[1])
+
+                pipelineId, pipelineStatus = self._cicd.waitPipeline(projectId)
+
+                if pipelineStatus == "success":
+                    logger.success("Pipeline has successfully terminated.")
+                    return pipelineId
+
+                elif pipelineStatus == "failed":
+                    logger.error("Pipeline has failed.")
+                    logger.error("#TODO: display failure reason")
+                    # self.__displayFailureReasons(project, runId)
+                    return None
+
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            pass
+
+    def __extractPipelineOutput(self, project, resultsFilename="secrets.txt"):
+
+        projectPath = project.get("path_with_namespace")
+
+        with open(
+            f"{self._cicd.outputDir}/{projectPath}/{self._fileName}",
+            "rb",
+        ) as output:
+            try:
+
+                pipelineResults = output.read()
+
+            except:
+                output.seek(0)
+                pipelineResults = output.read()
+
+        logger.success("Output:")
+        logger.raw(pipelineResults, logging.INFO)
+
+    def __clean(self, project):
+        projectId = project.get("id")
+        if self._cleanLogs:
+            logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
+            self._cicd.cleanAllLogs(projectId)
+        if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
+            gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+        else:
+            self.__deleteRemoteBranch()
+
+    def manualCleanLogs(self):
+        logger.info("Deleting logs")
+        for project in self._cicd.projects:
+            logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
+            self._cicd.cleanAllLogs(project.get("id"))
+
+    def __deleteRemoteBranch(self):
+        logger.info("Deleting remote branch")
+        gitCleanRemote(self._cicd.branchName)

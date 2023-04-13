@@ -485,6 +485,7 @@ class GitHub:
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
         with open(f"{self._outputDir}/{repo}/workflow_{name}_{date}.zip", "wb") as f:
             f.write(zipFile.content)
+        f.close()
         return f"workflow_{name}_{date}.zip"
 
     def getFailureReason(self, repo, workflowId):

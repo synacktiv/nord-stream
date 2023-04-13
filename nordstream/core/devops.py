@@ -455,7 +455,7 @@ class DevOpsRunner:
                     return pipeline.get("id")
             raise Exception("unable to create a pipeline")
 
-    def __runsCustomPipeline(self, projectId, pipelineId):
+    def __runCustomPipeline(self, projectId, pipelineId):
         pipelineGenerator = DevOpsPipelineGenerator()
         pipelineGenerator.loadFile(self._yaml)
 
@@ -499,7 +499,7 @@ class DevOpsRunner:
                 pipelineId = self.__createPipeline(projectId, repoId)
 
                 if self._yaml:
-                    self.__runsCustomPipeline(projectId, pipelineId)
+                    self.__runCustomPipeline(projectId, pipelineId)
                 else:
                     self.__runSecretsExtractionPipeline(projectId, pipelineId)
 
