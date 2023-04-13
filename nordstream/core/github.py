@@ -27,6 +27,7 @@ class GitHubWorkflowRunner:
     _writeAccessFilter = False
     _branchAlreadyExists = False
     _pushedCommitsCount = 0
+    _cleanLogs = True
 
     def __init__(self, cicd, env):
         self._cicd = cicd
@@ -144,6 +145,14 @@ class GitHubWorkflowRunner:
     @forceDeploy.setter
     def forceDeploy(self, value):
         self._forceDeploy = value
+
+    @property
+    def cleanLogs(self):
+        return self._cleanLogs
+
+    @cleanLogs.setter
+    def cleanLogs(self, value):
+        self._cleanLogs = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/github"
@@ -453,7 +462,8 @@ class GitHubWorkflowRunner:
             logger.raw(deleteOutput.communicate()[1], logging.INFO)
 
     def __clean(self, repo):
-        self._cicd.cleanAllLogs(repo, self._workflowFilename)
+        if self._cleanLogs:
+            self._cicd.cleanAllLogs(repo, self._workflowFilename)
         if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
             gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
         else:

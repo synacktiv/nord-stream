@@ -2,11 +2,11 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name>]
-    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name>]
+    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
-    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --branch-name <name>]
+    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo>]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
@@ -24,6 +24,7 @@ args
     -r, --repo <repo>                       Run on selected repo (can be a file)
     -y, --yaml <yaml>                       Run arbitrary job
     --clean-logs                            Delete all logs created by this tool. This operation is done by default but can be manually triggered.
+    --no-clean                              Don't clean workflow logs (default false)
     --clean-branch-policy                   Remove branch policy, can be used with --repo. This operation is done by default but can be manually triggered.
     --build-yaml <filename>                 Create a pipeline yaml file with all secrets.
     --env <env>                             Specify env for the yaml file creation.
@@ -103,6 +104,8 @@ def start(argv):
         gitHubWorkflowRunner.subscriptionId = args["--azure-subscription-id"]
     if args["--azure-client-id"]:
         gitHubWorkflowRunner.clientId = args["--azure-client-id"]
+    if args["--no-clean"]:
+        gitHubWorkflowRunner.cleanLogs = not args["--no-clean"]
 
     gitHubWorkflowRunner.getRepos(args["--repo"])
     # logic

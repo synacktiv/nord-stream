@@ -4,7 +4,7 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py gitlab [options] --token <pat> --list-secrets [--project <project> --group <group> --no-project --no-group --no-instance]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--write-filter]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
 
 Options:
