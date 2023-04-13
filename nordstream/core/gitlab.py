@@ -1,27 +1,45 @@
 import logging
 
-from os.path import exists
+from os import makedirs, chdir
+from os.path import exists, realpath
 from nordstream.git import *
 from nordstream.utils.errors import GitLabError
 
 
 class GitLabRunner:
     _cicd = None
+    _writeAccessFilter = False
+
+    @property
+    def writeAccessFilter(self):
+        return self._writeAccessFilter
+
+    @writeAccessFilter.setter
+    def writeAccessFilter(self, value):
+        self._writeAccessFilter = value
 
     def __init__(self, cicd):
         self._cicd = cicd
+        self.__createLogDir()
+
+    def __createLogDir(self):
+        self._cicd.outputDir = realpath(self._cicd.outputDir) + "/gitlab"
+        makedirs(self._cicd.outputDir, exist_ok=True)
 
     def getProjects(self, project):
         if project:
             if exists(project):
                 with open(project, "r") as file:
                     for p in file:
-                        self._cicd.addProject(p.strip())
+                        self._cicd.addProject(project=p.strip(), filterWrite=self._writeAccessFilter)
 
             else:
-                self._cicd.addProject(project)
+                self._cicd.addProject(project=project, filterWrite=self._writeAccessFilter)
         else:
-            self._cicd.addProject()
+            self._cicd.addProject(filterWrite=self._writeAccessFilter)
+
+        if len(self._cicd.projects) == 0:
+            logger.critical("No repository found.")
 
     def listGitLabSecrets(self):
         logger.info("Listing GitLab secrets")
@@ -42,7 +60,7 @@ class GitLabRunner:
                     value = variable.get("value")
                     protected = variable.get("protected")
                     logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} protected:{variable["protected"]}\n', logging.INFO
+                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
         except GitLabError as e:
             logger.error(f"\t{e}")

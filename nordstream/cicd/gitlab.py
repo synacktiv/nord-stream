@@ -1,4 +1,5 @@
 import requests
+from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 
@@ -33,6 +34,14 @@ class GitLab:
     def url(self):
         return self._url
 
+    @property
+    def outputDir(self):
+        return self._outputDir
+
+    @outputDir.setter
+    def outputDir(self, value):
+        self._outputDir = value
+
     @classmethod
     def checkToken(cls, token, gitlabURL):
         logger.verbose(f"Checking token: {token}")
@@ -64,15 +73,24 @@ class GitLab:
             verify=self._verifyCert,
         )
         if response.status_code == 200:
+
+            path = self.__createOutputDir(project.get("path_with_namespace"))
+
+            f = open(f"{path}/secrets.txt", "w")
+
             # logger.debug(response.json())
             for variable in response.json():
                 # print(variable['key'], variable['value'], variable['protected'])
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+
+                f.write(f"{variable['key']}={variable['value']}\n")
+
+            f.close()
         elif response.status_code == 403:
             raise GitLabError(response.json().get("message"))
         return res
 
-    def addProject(self, project=None):
+    def addProject(self, project=None, filterWrite=False):
         logger.debug(f"Checking project: {project}")
 
         # username = self.retieveUsernameFromToken()
@@ -81,10 +99,14 @@ class GitLab:
         i = 1
         while True:
 
-            if project == None:
-                params = {"per_page": 100, "page": i}
-            else:
-                params = {"per_page": 100, "page": i, "search_namespaces": True, "search": project}
+            params = {"per_page": 100, "page": i}
+
+            if project != None:
+                params["search_namespaces"] = True
+                params["search"] = project
+
+            if filterWrite:
+                params["min_access_level"] = 30
 
             response = self._session.get(
                 f"{self._gitlabURL}/api/v4/projects",
@@ -108,3 +130,9 @@ class GitLab:
             else:
                 logger.error("Error while retrieving projects")
                 logger.debug(response.json())
+
+    def __createOutputDir(self, project):
+        outputName = project.replace("/", "_")
+        path = f"{self._outputDir}/{outputName}"
+        makedirs(path, exist_ok=True)
+        return path

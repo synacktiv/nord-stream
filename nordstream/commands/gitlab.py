@@ -16,6 +16,7 @@ args
     --project <project>                     Run on selected project (can be a file)
     --list-secrets                          List all secrets.
     --list-projects                         List all projects.
+    --write-filter                          Filter repo where current user has developer access or more.
 """
 
 from docopt import docopt
@@ -41,6 +42,9 @@ def start(argv):
     # gitlab setup
     gitlab = GitLab(args["--url"], args["--token"])
     gitLabRunner = GitLabRunner(gitlab)
+
+    if args["--write-filter"]:
+        gitLabRunner.writeAccessFilter = args["--write-filter"]
 
     gitLabRunner.getProjects(args["--project"])
 
