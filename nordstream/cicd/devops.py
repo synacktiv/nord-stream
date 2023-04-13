@@ -392,11 +392,38 @@ class DevOps:
             headers=self._header,
             verify=self._verifyCert,
         ).json()
-        logId = [
+
+        logs = [
             record["log"]["id"]
             for record in buildTimeline["records"]
             if record["name"] == DevOpsPipelineGenerator.taskName
-        ][0]
+        ]
+
+        if len(logs) == 0:
+            for i in range(self._maxRetry):
+                logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
+                time.sleep(self._sleepTimeOutput)
+                buildTimeline = self._session.get(
+                    f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
+                    json={},
+                    auth=self._auth,
+                    headers=self._header,
+                    verify=self._verifyCert,
+                ).json()
+
+                logs = [
+                    record["log"]["id"]
+                    for record in buildTimeline["records"]
+                    if record["name"] == DevOpsPipelineGenerator.taskName
+                ]
+                if len(logs) != 0:
+                    break
+                if i == (self._maxRetry - 1):
+                    logger.error("Output still no ready, error !")
+                    return None
+
+        logId = logs[0]
+
         logger.debug(f"Log ID of the extraction task: {logId}")
         logOutput = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
@@ -471,7 +498,7 @@ class DevOps:
                         verify=self._verifyCert,
                     )
 
-    def __deletePipelines(self, projectId):
+    def __deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/build/Definitions",
@@ -493,9 +520,8 @@ class DevOps:
                     )
 
     def cleanAllLogs(self, projectId):
-        logger.info(f"Cleaning logs for: {projectId}")
         # deleting the pipeline removes everything
-        self.__deletePipelines(projectId)
+        self.__deletePipeline(projectId)
 
     def listServiceConnections(self, projectId):
         logger.debug("Listing service connections")

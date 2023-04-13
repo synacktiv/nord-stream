@@ -18,7 +18,7 @@ class DevOpsRunner:
     _writeAccessFilter = False
     _pipelineFilename = "azure-pipeline.yaml"
     _output = None
-    _clean = True
+    _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
 
     def __init__(self, cicd):
@@ -66,12 +66,12 @@ class DevOpsRunner:
         self._output = value
 
     @property
-    def clean(self):
-        return self._clean
+    def cleanLogs(self):
+        return self._cleanLogs
 
-    @clean.setter
-    def clean(self, value):
-        self._clean = value
+    @cleanLogs.setter
+    def cleanLogs(self, value):
+        self._cleanLogs = value
 
     @property
     def yaml(self):
@@ -380,7 +380,9 @@ class DevOpsRunner:
     def manualCleanLogs(self):
         logger.info("Deleting logs")
         for project in self._cicd.projects:
-            self._cicd.cleanAllLogs(project.get("id"))
+            projectId = project.get("id")
+            logger.info(f"Cleaning logs for project: {projectId}")
+            self._cicd.cleanAllLogs(projectId)
 
     def __runSecretsExtractionPipeline(self, projectId, pipelineId):
         if self._extractVariableGroups:
@@ -434,13 +436,14 @@ class DevOpsRunner:
         #    logger.raw(deleteOutput.communicate()[1], logging.INFO)
 
     def __clean(self, projectId, repoId, deleteRemoteRepo):
-        if self._clean:
+        if self._cleanLogs:
+            logger.info(f"Cleaning logs for project: {projectId}")
             self._cicd.cleanAllLogs(projectId)
-            if deleteRemoteRepo:
-                logger.info("Deleting remote repository")
-                self._cicd.deleteGit(projectId, repoId)
-            else:
-                self.__deleteRemoteBranch()
+        if deleteRemoteRepo:
+            logger.info("Deleting remote repository")
+            self._cicd.deleteGit(projectId, repoId)
+        else:
+            self.__deleteRemoteBranch()
 
     def __createPipeline(self, projectId, repoId):
         logger.info("Creating pipeline")

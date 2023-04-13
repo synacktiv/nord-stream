@@ -3,9 +3,9 @@ CICD pipeline exploitation tool
 
 Usage:
     nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter]
+    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean]
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
-    nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--repo <repo>]
+    nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
     nord-stream.py devops [options] --token <pat> --org <org> --list-secrets [--project <project> --write-filter]
 
@@ -21,6 +21,7 @@ args
     -p, --project <project>                 Run on selected project (can be a file)
     -y, --yaml <yaml>                       Run arbitrary job
     --clean-logs                            Delete all pipeline created by this tool. This operation is done by default but can be manually triggered.
+    --no-clean                              Don't clean pipeline logs (default false)
     --no-vg                                 Don't extract variable groups secrets
     --no-sf                                 Don't extract secure files
     --no-gh                                 Don't extract GitHub service connection secrets
@@ -76,7 +77,7 @@ def start(argv):
     if args["--no-gh"]:
         devopsRunner.extractGitHubServiceconnections = not args["--no-gh"]
     if args["--no-clean"]:
-        devopsRunner.clean = not args["--no-clean"]
+        devopsRunner.cleanLogs = not args["--no-clean"]
 
     devopsRunner.getProjects(args["--project"])
     # logic

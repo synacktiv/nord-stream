@@ -320,7 +320,7 @@ class GitLab:
         f.close()
         return f"pipeline_{date}.log"
 
-    def __deletePipelines(self, projectId):
+    def __deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
 
         response = self._session.get(
@@ -339,4 +339,5 @@ class GitLab:
             )
 
     def cleanAllLogs(self, projectId):
-        self.__deletePipelines(projectId)
+        # deleting the pipeline removes everything
+        self.__deletePipeline(projectId)
