@@ -291,7 +291,7 @@ class GitLab:
 
         projectId = project.get("id")
 
-        jobId = self.__getJobId(projectId)
+        jobId = self.__getJobId(projectId, pipelineId)
 
         response = self._session.get(
             f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
