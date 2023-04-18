@@ -109,15 +109,16 @@ def start(argv):
     if args["--no-clean"]:
         gitHubWorkflowRunner.cleanLogs = not args["--no-clean"]
 
-    gitHubWorkflowRunner.getRepos(args["--repo"])
     # logic
     if args["--describe-token"]:
         gitHubWorkflowRunner.describeToken()
 
     elif args["--list-repos"]:
+        gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.listGitHubRepos()
 
     elif args["--list-secrets"]:
+        gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.listGitHubSecrets()
 
     elif args["--build-yaml"]:
@@ -126,13 +127,16 @@ def start(argv):
 
     # Cleaning
     elif args["--clean-logs"] or args["--clean-branch-policy"]:
+        gitHubWorkflowRunner.getRepos(args["--repo"])
         if args["--clean-logs"]:
             gitHubWorkflowRunner.manualCleanLogs()
         if args["--clean-branch-policy"]:
             gitHubWorkflowRunner.manualCleanBranchPolicy()
 
     elif args["--list-protections"]:
+        gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.checkBranchProtections()
 
     else:
+        gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.runWorkflow()

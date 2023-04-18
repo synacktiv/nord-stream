@@ -365,3 +365,63 @@ class GitLabRunner:
         note = response.get("note")
         if note != "" and note != None:
             logger.raw(f"\t- Note: {note}\n", logging.INFO)
+
+    def listBranchProtectionRules(self):
+        logger.info("Listing branch protection rules.")
+        for project in self._cicd.projects:
+
+            projectName = project.get("path_with_namespace")
+            logger.info(f"{projectName}:")
+
+            try:
+                protections = self._cicd.getBranchProtectionRules(project.get("id"))
+            except GitLabError as e:
+                logger.error(f"\t{e}")
+            else:
+
+                if len(protections) == 0:
+                    logger.success(f"No protection")
+
+                for protection in protections:
+
+                    name = protection.get("name")
+                    logger.info(f'branch: "{name}"')
+
+                    allow_force_push = protection.get("allow_force_push")
+                    logger.raw(f"\t- Allow force push: {allow_force_push}\n", logging.INFO)
+
+                    code_owner_approval_required = protection.get("code_owner_approval_required", None)
+                    if code_owner_approval_required != None:
+                        logger.raw(f"\t- Code Owner approval required: {code_owner_approval_required}\n", logging.INFO)
+
+                    push_access_levels = protection.get("push_access_levels")
+                    logger.raw(f"\t- Push access level:\n", logging.INFO)
+                    self.__displayAccessLevel(push_access_levels)
+
+                    unprotect_access_levels = protection.get("unprotect_access_levels")
+                    logger.raw(f"\t- Unprotect access level:\n", logging.INFO)
+                    self.__displayAccessLevel(unprotect_access_levels)
+
+                    merge_access_levels = protection.get("merge_access_levels")
+                    logger.raw(f"\t- Merge access level:\n", logging.INFO)
+                    self.__displayAccessLevel(merge_access_levels)
+
+            logger.empty_line()
+
+    def __displayAccessLevel(self, access_levels):
+        for al in access_levels:
+            access_level = al.get("access_level", None)
+            user_id = al.get("user_id", None)
+            group_id = al.get("group_id", None)
+            access_level_description = al.get("access_level_description")
+
+            res = f"\t\t{access_level_description}"
+
+            if access_level != None:
+                res += f" (access_level={access_level})"
+            if user_id != None:
+                res += f" (user_id={user_id})"
+            if group_id != None:
+                res += f" (group_id={group_id})"
+
+            logger.raw(f"{res}\n", logging.INFO)

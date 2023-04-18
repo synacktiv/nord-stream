@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> --list-secrets [--project <project> --group <group> --no-project --no-group --no-instance]
+    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections)[--project <project> --group <group> --no-project --no-group --no-instance]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
     nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
@@ -21,6 +21,7 @@ args
     --project <project>                     Run on selected project (can be a file)
     --group <group>                         Run on selected group (can be a file)
     --list-secrets                          List all secrets.
+    --list-protections                      List branch protection rules.
     --list-projects                         List all projects.
     --list-groups                           List all groups.
     --write-filter                          Filter repo where current user has developer access or more.
@@ -85,6 +86,10 @@ def start(argv):
     elif args["--list-projects"]:
         gitLabRunner.getProjects(args["--project"])
         gitLabRunner.listGitLabProjects()
+
+    elif args["--list-protections"]:
+        gitLabRunner.getProjects(args["--project"])
+        gitLabRunner.listBranchProtectionRules()
 
     elif args["--list-groups"]:
         gitLabRunner.getGroups(args["--group"])

@@ -395,3 +395,16 @@ class GitLab:
             else:
                 logger.error("Error while retrieving event")
                 logger.debug(response.json())
+
+    def getBranchProtectionRules(self, projectId):
+        logger.debug("Getting branch protection rules")
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/protected_branches",
+            headers=self._header,
+            verify=self._verifyCert,
+        )
+
+        if response.status_code == 403:
+            raise GitLabError(response.json().get("message"))
+
+        return response.json()
