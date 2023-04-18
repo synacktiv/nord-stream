@@ -270,9 +270,16 @@ class GitLabRunner:
         pushOutput.wait()
 
         try:
-            if pushOutput.returncode != 0 or b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+            if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+                logger.error("Error when pushing code: Everything up-to-date")
+                logger.warning(
+                    "Your trying to push the same code on an existing branch, modify the yaml file to push it."
+                )
+
+            elif pushOutput.returncode != 0:
                 logger.error("Error when pushing code:")
                 logger.raw(pushOutput.communicate()[1], logging.INFO)
+
             else:
                 self._pushedCommitsCount += 1
                 logger.raw(pushOutput.communicate()[1])

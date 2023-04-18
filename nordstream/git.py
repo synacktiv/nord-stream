@@ -11,6 +11,8 @@ Return True if the command succeeds (returns 0), else return False.
 
 ATTACK_COMMIT_MSG = "Test deployment"
 CLEAN_COMMIT_MSG = "Remove test deployment"
+LOCAL_USERNAME = "nord-stream"
+LOCAL_EMAIL = "nord-stream@localhost.com"
 
 
 def gitRunCommand(command):
@@ -29,11 +31,8 @@ def gitRunCommand(command):
 def gitInitialization(branch, branchAlreadyExists=False):
     logger.verbose("Git init")
 
-    if not gitIsGloalUserConfigured():
-        gitRunCommand("git config --global user.Name test")
-
-    if not gitIsGloalEmailConfigured():
-        gitRunCommand("git config --global user.email test@test.com")
+    gitRunCommand(f"git config user.Name {LOCAL_USERNAME}")
+    gitRunCommand(f"git config user.email {LOCAL_EMAIL}")
 
     if branchAlreadyExists:
         gitRunCommand(f"git checkout {branch}")
@@ -62,7 +61,7 @@ def gitUndoLastPushedCommits(branch, pushedCommitsCount):
         gitRunCommand("git reset --hard HEAD~")
 
     if pushedCommitsCount and not gitRunCommand(f"git push -f origin {branch}"):
-        logger.warning("Could not delete commit(s) pushed by the tool")
+        logger.warning("Could not delete commit(s) pushed by the tool.")
 
 
 def gitDeleteRemote(branch):
@@ -119,6 +118,7 @@ def gitGetCurrentBranch():
     )
 
 
+# not needed anymore
 def gitIsGloalUserConfigured():
     res = subprocess.Popen(
         "git config --global user.Name",
@@ -133,6 +133,7 @@ def gitIsGloalUserConfigured():
     return True
 
 
+# not needed anymore
 def gitIsGloalEmailConfigured():
     res = subprocess.Popen(
         "git config --global user.email",

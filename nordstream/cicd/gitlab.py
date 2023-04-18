@@ -3,6 +3,7 @@ import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
+from nordstream.git import ATTACK_COMMIT_MSG, LOCAL_USERNAME
 
 COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 
@@ -28,6 +29,7 @@ class GitLab:
         self._token = token
         self._header = {"PRIVATE-TOKEN": token}
         self._session = requests.Session()
+        # self._gitlabLogin = self.__getLogin()
         # self._session.headers.update({"PRIVATE-TOKEN": token})
 
     @property
@@ -78,7 +80,7 @@ class GitLab:
             == 200
         )
 
-    def retieveUsernameFromToken(self):
+    def __getLogin(self):
         response = self.getUser()
         return response["username"]
 
@@ -164,7 +166,7 @@ class GitLab:
     def addProject(self, project=None, filterWrite=False, strict=False):
         logger.debug(f"Checking project: {project}")
 
-        # username = self.retieveUsernameFromToken()
+        # username = self.__getLogin()
         # response = self._session.get(f"https://gitlab.com/api/v4/users/{username}/projects", headers=self._header)
 
         i = 1
@@ -333,6 +335,23 @@ class GitLab:
 
         for pipeline in response:
 
+            # additional checks for non default branches
+            # we don't want to remove legitimate logs
+            if self._branchName != self._DEFAULT_BRANCH_NAME:
+                commitId = pipeline.get("sha")
+
+                response = self._session.get(
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/commits/{commitId}",
+                    headers=self._header,
+                    verify=self._verifyCert,
+                ).json()
+
+                if response.get("title") != ATTACK_COMMIT_MSG:
+                    continue
+
+                if response.get("author_name") != LOCAL_USERNAME:
+                    continue
+
             pipelineId = pipeline.get("id")
             response = self._session.delete(
                 f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}",
@@ -343,8 +362,6 @@ class GitLab:
     def cleanAllLogs(self, projectId):
         # deleting the pipeline removes everything
         self.__deletePipeline(projectId)
-        # don't work
-        # self.__cleanEvents(projectId)
 
     def __cleanEvents(self, projectId):
         logger.debug(f"Deleting events for project: {projectId}")

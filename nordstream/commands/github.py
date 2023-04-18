@@ -80,6 +80,7 @@ def start(argv):
         gitHub.org = args["--org"]
     if args["--branch-name"]:
         gitHub.branchName = args["--branch-name"]
+        logger.info(f'Using branch: "{gitHub.branchName}"')
 
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])

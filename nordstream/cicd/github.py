@@ -73,7 +73,7 @@ class GitHub:
         return self.getUser().get("login")
 
     def getUser(self):
-        logger.verbose("Retrieving user informations")
+        logger.debug("Retrieving user informations")
         return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header).json()
 
     def listRepos(self):
