@@ -515,3 +515,15 @@ class DevOpsRunner:
                 self.__clean(projectId, repoId, deleteRemoteRepo)
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{self._cicd.repoName}", shell=True).wait()
+
+    def describeToken(self):
+        response = self._cicd.getUser()
+        logger.info("Token information:")
+
+        username = response.get("authenticatedUser").get("properties").get("Account").get("$value")
+        if username != "":
+            logger.raw(f"\t- Username: {username}\n", logging.INFO)
+
+        id = response.get("authenticatedUser").get("id")
+        if id != "":
+            logger.raw(f"\t- Id: {id}\n", logging.INFO)

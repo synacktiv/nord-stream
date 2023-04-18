@@ -10,6 +10,7 @@ Usage:
     nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo>]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
+    nord-stream.py github [options] --token <ghp> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -42,6 +43,7 @@ args
     --write-filter                          Filter repo where current user has write or admin access.
     --force                                 Don't check environment and branch protections.
     --branch-name <name>                    Use specific branch name for deployment.
+    --describe-token                        Display information on the token
 
 Examples:
     Dump all secrets from all repositories and try to disable branch protections
@@ -78,7 +80,6 @@ def start(argv):
         gitHub.org = args["--org"]
     if args["--branch-name"]:
         gitHub.branchName = args["--branch-name"]
-    logger.info(f'Using branch: "{gitHub.branchName}"')
 
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])
@@ -109,7 +110,10 @@ def start(argv):
 
     gitHubWorkflowRunner.getRepos(args["--repo"])
     # logic
-    if args["--list-repos"]:
+    if args["--describe-token"]:
+        gitHubWorkflowRunner.describeToken()
+
+    elif args["--list-repos"]:
         gitHubWorkflowRunner.listGitHubRepos()
 
     elif args["--list-secrets"]:

@@ -68,14 +68,16 @@ class DevOps:
         self._outputDir = value
 
     def __getLogin(self):
-        logger.debug("Getting user login")
-        response = self._session.get(
+        return self.getUser().get("authenticatedUser").get("id")
+
+    def getUser(self):
+        logger.debug("Retrieving user informations")
+        return self._session.get(
             f"{self._baseURL}/_apis/ConnectionData",
             auth=self._auth,
             headers=self._header,
             verify=self._verifyCert,
         ).json()
-        return response.get("authenticatedUser").get("id")
 
     def listProjects(self):
         logger.debug("Listing projects")

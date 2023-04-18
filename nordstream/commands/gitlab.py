@@ -6,6 +6,7 @@ Usage:
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
     nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
+    nord-stream.py gitlab [options] --token <pat> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -30,6 +31,7 @@ args
     --branch-name <name>                    Use specific branch name for deployment.
     --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
+    --describe-token                        Display information on the token
 """
 
 from docopt import docopt
@@ -77,7 +79,10 @@ def start(argv):
         gitLabRunner.yaml = args["--yaml"]
 
     # logic
-    if args["--list-projects"]:
+    if args["--describe-token"]:
+        gitLabRunner.describeToken()
+
+    elif args["--list-projects"]:
         gitLabRunner.getProjects(args["--project"])
         gitLabRunner.listGitLabProjects()
 

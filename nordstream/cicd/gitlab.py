@@ -79,14 +79,16 @@ class GitLab:
         )
 
     def retieveUsernameFromToken(self):
-        logger.verbose(f"Retrieving user from token")
-        response = self._session.get(
+        response = self.getUser()
+        return response["username"]
+
+    def getUser(self):
+        logger.debug(f"Retrieving user informations")
+        return self._session.get(
             f"{self._gitlabURL}/api/v4/user",
             headers=self._header,
             verify=self._verifyCert,
         ).json()
-
-        return response["username"]
 
     def listVariablesFromProject(self, project):
         id = project.get("id")

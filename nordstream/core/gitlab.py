@@ -332,3 +332,26 @@ class GitLabRunner:
     def __deleteRemoteBranch(self):
         logger.info("Deleting remote branch")
         gitCleanRemote(self._cicd.branchName)
+
+    def describeToken(self):
+        response = self._cicd.getUser()
+        logger.info("Token information:")
+
+        username = response.get("username")
+        if username != "":
+            logger.raw(f"\t- Username: {username}\n", logging.INFO)
+
+        isAdmin = response.get("is_admin")
+        logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+
+        email = response.get("email")
+        if email != "":
+            logger.raw(f"\t- Email: {email}\n", logging.INFO)
+
+        id = response.get("id")
+        if id != "":
+            logger.raw(f"\t- Id: {id}\n", logging.INFO)
+
+        note = response.get("note")
+        if note != "":
+            logger.raw(f"\t- Note: {note}\n", logging.INFO)

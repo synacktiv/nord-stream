@@ -470,6 +470,9 @@ class GitHubWorkflowRunner:
             self.__deleteRemoteBranch()
 
     def runWorkflow(self):
+
+        logger.info(f'Using branch: "{self._cicd.branchName}"')
+
         for repo in self._cicd.repos:
             logger.success(f'"{repo}"')
 
@@ -721,3 +724,30 @@ class GitHubWorkflowRunner:
         if policyId is not None:
             self._cicd.deleteDeploymentBranchPolicy(repo, env)
         self._cicd.modifyEnvProtectionRules(repo, env, waitTime, reviewers, branchPolicy)
+
+    def describeToken(self):
+        response = self._cicd.getUser()
+        logger.info("Token information:")
+
+        login = response.get("login")
+        if login != None:
+            logger.raw(f"\t- Login: {login}\n", logging.INFO)
+
+        isAdmin = response.get("site_admin")
+        logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+
+        email = response.get("email")
+        if email != None:
+            logger.raw(f"\t- Email: {email}\n", logging.INFO)
+
+        id = response.get("id")
+        if id != None:
+            logger.raw(f"\t- Id: {id}\n", logging.INFO)
+
+        bio = response.get("bio")
+        if bio != "":
+            logger.raw(f"\t- Bio: {bio}\n", logging.INFO)
+
+        company = response.get("company")
+        if company != None:
+            logger.raw(f"\t- Company: {company}\n", logging.INFO)
