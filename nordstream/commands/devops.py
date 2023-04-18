@@ -14,6 +14,7 @@ Options:
     --version                               Show version.
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
+    --output-dir <dir>                      Output directory for logs
 
 args
     --token <pat>                           Azure DevOps personal token
@@ -59,8 +60,10 @@ def start(argv):
     if not DevOps.checkToken(args["--token"], args["--org"]):
         logger.critical("Invalid token or org.")
 
-    # github setup
+    # devops setup
     devops = DevOps(args["--token"], args["--org"])
+    if args["--output-dir"]:
+        devops.outputDir = args["--output-dir"] + "/"
     devopsRunner = DevOpsRunner(devops)
 
     if args["--yaml"]:

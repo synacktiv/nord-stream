@@ -341,3 +341,38 @@ class GitLab:
     def cleanAllLogs(self, projectId):
         # deleting the pipeline removes everything
         self.__deletePipeline(projectId)
+        # don't work
+        # self.__cleanEvents(projectId)
+
+    def __cleanEvents(self, projectId):
+        logger.debug(f"Deleting events for project: {projectId}")
+
+        i = 1
+        while True:
+
+            params = {"per_page": 100, "page": i}
+
+            response = self._session.get(
+                f"{self._gitlabURL}/api/v4/projects/{projectId}/events",
+                headers=self._header,
+                params=params,
+                verify=self._verifyCert,
+            )
+
+            if response.status_code == 200:
+                if len(response.json()) == 0:
+                    break
+
+                for event in response.json():
+                    eventId = event.get("id")
+                    # don't work
+                    response = self._session.delete(
+                        f"{self._gitlabURL}/api/v4/projects/{projectId}/events/{eventId}",
+                        headers=self._header,
+                        verify=self._verifyCert,
+                    )
+
+                i += 1
+            else:
+                logger.error("Error while retrieving event")
+                logger.debug(response.json())

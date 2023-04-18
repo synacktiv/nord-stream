@@ -12,6 +12,7 @@ Options:
     --version                               Show version.
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
+    --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
 
 args
@@ -53,6 +54,8 @@ def start(argv):
 
     # gitlab setup
     gitlab = GitLab(args["--url"], args["--token"])
+    if args["--output-dir"]:
+        gitlab.outputDir = args["--output-dir"] + "/"
     gitLabRunner = GitLabRunner(gitlab)
 
     if args["--branch-name"]:
@@ -67,7 +70,7 @@ def start(argv):
     if args["--no-group"]:
         gitLabRunner.extractGroup = not args["--no-group"]
     if args["--no-instance"]:
-        gitLabRunner.extractinstance = not args["--no-instance"]
+        gitLabRunner.extractInstance = not args["--no-instance"]
     if args["--no-clean"]:
         gitLabRunner.cleanLogs = not args["--no-clean"]
     if args["--yaml"]:

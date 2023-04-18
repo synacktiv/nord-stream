@@ -67,7 +67,7 @@ class GitHub:
 
     @outputDir.setter
     def outputDir(self, value):
-        self._outputDir = value
+        self._outputDir = value + "/" + self._outputDir
 
     def __getLogin(self):
         logger.debug("Getting user login")

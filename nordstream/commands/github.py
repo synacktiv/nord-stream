@@ -73,7 +73,7 @@ def start(argv):
     # github setup
     gitHub = GitHub(args["--token"])
     if args["--output-dir"]:
-        gitHub.outputDir = args["--output-dir"]
+        gitHub.outputDir = args["--output-dir"] + "/"
     if args["--org"]:
         gitHub.org = args["--org"]
     if args["--branch-name"]:
