@@ -81,7 +81,6 @@ class GitLabRunner:
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/gitlab"
-        logger.debug(self._cicd.outputDir)
         makedirs(self._cicd.outputDir, exist_ok=True)
 
     def getProjects(self, project, strict=False):
