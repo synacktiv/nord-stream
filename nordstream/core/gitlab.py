@@ -342,7 +342,10 @@ class GitLabRunner:
             logger.raw(f"\t- Username: {username}\n", logging.INFO)
 
         isAdmin = response.get("is_admin")
-        logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+        if isAdmin == None:
+            logger.raw(f"\t- IsAdmin: False\n", logging.INFO)
+        else:
+            logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
 
         email = response.get("email")
         if email != "":
@@ -353,5 +356,5 @@ class GitLabRunner:
             logger.raw(f"\t- Id: {id}\n", logging.INFO)
 
         note = response.get("note")
-        if note != "":
+        if note != "" and note != None:
             logger.raw(f"\t- Note: {note}\n", logging.INFO)
