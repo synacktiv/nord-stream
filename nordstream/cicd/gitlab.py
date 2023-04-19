@@ -29,7 +29,7 @@ class GitLab:
         self._token = token
         self._header = {"PRIVATE-TOKEN": token}
         self._session = requests.Session()
-        # self._gitlabLogin = self.__getLogin()
+        self._gitlabLogin = self.__getLogin()
         # self._session.headers.update({"PRIVATE-TOKEN": token})
 
     @property
@@ -92,75 +92,98 @@ class GitLab:
             verify=self._verifyCert,
         ).json()
 
+    def __paginatedGet(self, url, params={}):
+
+        params["per_page"] = 100
+
+        res = []
+
+        i = 1
+        while True:
+
+            params["page"] = i
+
+            response = self._session.get(
+                url,
+                headers=self._header,
+                params=params,
+                verify=self._verifyCert,
+            )
+
+            if response.status_code == 200:
+                if len(response.json()) == 0:
+                    break
+                res.extend(response.json())
+                i += 1
+
+            else:
+                logger.error("Error {response.status_code} while retrieving data: {url}")
+                return response.status_code, response.json()
+
+        return response.status_code, res
+
     def listVariablesFromProject(self, project):
         id = project.get("id")
         res = []
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{id}/variables",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
-        if response.status_code == 200:
+
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/variables")
+
+        if status_code == 200:
 
             path = self.__createOutputDir(project.get("path_with_namespace"))
 
             f = open(f"{path}/secrets.txt", "w")
 
-            for variable in response.json():
+            for variable in response:
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
             f.close()
-        elif response.status_code == 403:
-            raise GitLabError(response.json().get("message"))
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
         return res
 
     def listVariablesFromGroup(self, group):
         id = group.get("id")
         res = []
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/groups/{id}/variables",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
-        if response.status_code == 200:
+
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/groups/{id}/variables")
+
+        if status_code == 200:
 
             path = self.__createOutputDir(group.get("full_path"))
 
             f = open(f"{path}/secrets.txt", "w")
 
-            for variable in response.json():
+            for variable in response:
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
             f.close()
-        elif response.status_code == 403:
-            raise GitLabError(response.json().get("message"))
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
         return res
 
     def listVariablesFromInstance(self):
         res = []
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/admin/ci/variables",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
-        if response.status_code == 200:
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/admin/ci/variables")
+
+        if status_code == 200:
 
             path = self.__createOutputDir("")
 
             f = open(f"{path}/secrets.txt", "w")
 
-            for variable in response.json():
+            for variable in response:
                 res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
             f.close()
-        elif response.status_code == 403:
-            raise GitLabError(response.json().get("message"))
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
         return res
 
     def addProject(self, project=None, filterWrite=False, strict=False):
@@ -253,7 +276,7 @@ class GitLab:
         time.sleep(5)
 
         response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
             headers=self._header,
             verify=self._verifyCert,
         ).json()
@@ -264,7 +287,7 @@ class GitLab:
                 time.sleep(self._sleepTime)
 
                 response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
                     headers=self._header,
                     verify=self._verifyCert,
                 ).json()
@@ -328,7 +351,7 @@ class GitLab:
         logger.debug("Deleting pipeline")
 
         response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}",
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
             headers=self._header,
             verify=self._verifyCert,
         ).json()
@@ -363,6 +386,7 @@ class GitLab:
         # deleting the pipeline removes everything
         self.__deletePipeline(projectId)
 
+    # not working
     def __cleanEvents(self, projectId):
         logger.debug(f"Deleting events for project: {projectId}")
 
@@ -396,7 +420,7 @@ class GitLab:
                 logger.error("Error while retrieving event")
                 logger.debug(response.json())
 
-    def getBranchProtectionRules(self, projectId):
+    def getBranchesProtectionRules(self, projectId):
         logger.debug("Getting branch protection rules")
         response = self._session.get(
             f"{self._gitlabURL}/api/v4/projects/{projectId}/protected_branches",
@@ -408,3 +432,15 @@ class GitLab:
             raise GitLabError(response.json().get("message"))
 
         return response.json()
+
+    def getBranches(self, projectId):
+        logger.debug("Getting branch protection rules (limited)")
+
+        status_code, response = self.__paginatedGet(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/branches"
+        )
+
+        if status_code == 403:
+            raise GitLabError(response.json().get("message"))
+
+        return response

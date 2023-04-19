@@ -366,7 +366,7 @@ class GitLabRunner:
         if note != "" and note != None:
             logger.raw(f"\t- Note: {note}\n", logging.INFO)
 
-    def listBranchProtectionRules(self):
+    def listBranchesProtectionRules(self):
         logger.info("Listing branch protection rules.")
         for project in self._cicd.projects:
 
@@ -374,39 +374,65 @@ class GitLabRunner:
             logger.info(f"{projectName}:")
 
             try:
-                protections = self._cicd.getBranchProtectionRules(project.get("id"))
+                protections = self._cicd.getBranchesProtectionRules(project.get("id"))
+                self.__displayBranchesProtectionRulesPriv(protections)
             except GitLabError as e:
-                logger.error(f"\t{e}")
-            else:
-
-                if len(protections) == 0:
-                    logger.success(f"No protection")
-
-                for protection in protections:
-
-                    name = protection.get("name")
-                    logger.info(f'branch: "{name}"')
-
-                    allow_force_push = protection.get("allow_force_push")
-                    logger.raw(f"\t- Allow force push: {allow_force_push}\n", logging.INFO)
-
-                    code_owner_approval_required = protection.get("code_owner_approval_required", None)
-                    if code_owner_approval_required != None:
-                        logger.raw(f"\t- Code Owner approval required: {code_owner_approval_required}\n", logging.INFO)
-
-                    push_access_levels = protection.get("push_access_levels")
-                    logger.raw(f"\t- Push access level:\n", logging.INFO)
-                    self.__displayAccessLevel(push_access_levels)
-
-                    unprotect_access_levels = protection.get("unprotect_access_levels")
-                    logger.raw(f"\t- Unprotect access level:\n", logging.INFO)
-                    self.__displayAccessLevel(unprotect_access_levels)
-
-                    merge_access_levels = protection.get("merge_access_levels")
-                    logger.raw(f"\t- Merge access level:\n", logging.INFO)
-                    self.__displayAccessLevel(merge_access_levels)
+                logger.verbose(
+                    "Not enough privileges to get full details on the branch protection rules for this project, trying to get limited information."
+                )
+                try:
+                    branches = self._cicd.getBranches(project.get("id"))
+                    self.__displayBranchesProtectionRulesUnpriv(branches)
+                except GitLabError as e:
+                    logger.error(f"\t{e}")
 
             logger.empty_line()
+
+    def __displayBranchesProtectionRulesPriv(self, protections):
+        if len(protections) == 0:
+            logger.success(f"No protection")
+
+        for protection in protections:
+
+            name = protection.get("name")
+            logger.info(f'branch: "{name}"')
+
+            allow_force_push = protection.get("allow_force_push")
+            logger.raw(f"\t- Allow force push: {allow_force_push}\n", logging.INFO)
+
+            code_owner_approval_required = protection.get("code_owner_approval_required", None)
+            if code_owner_approval_required != None:
+                logger.raw(f"\t- Code Owner approval required: {code_owner_approval_required}\n", logging.INFO)
+
+            push_access_levels = protection.get("push_access_levels")
+            logger.raw(f"\t- Push access level:\n", logging.INFO)
+            self.__displayAccessLevel(push_access_levels)
+
+            unprotect_access_levels = protection.get("unprotect_access_levels")
+            logger.raw(f"\t- Unprotect access level:\n", logging.INFO)
+            self.__displayAccessLevel(unprotect_access_levels)
+
+            merge_access_levels = protection.get("merge_access_levels")
+            logger.raw(f"\t- Merge access level:\n", logging.INFO)
+            self.__displayAccessLevel(merge_access_levels)
+
+    def __displayBranchesProtectionRulesUnpriv(self, branches):
+
+        for branch in branches:
+
+            isProtected = branch.get("protected")
+            if isProtected:
+
+                name = branch.get("name")
+                logger.info(f'branch: "{name}"')
+
+                logger.raw(f"\t- Protected: True\n", logging.INFO)
+
+                developers_can_push = branch.get("developers_can_push")
+                logger.raw(f"\t- Developers can push: {developers_can_push}\n", logging.INFO)
+
+                developers_can_merge = branch.get("developers_can_merge")
+                logger.raw(f"\t- Developers can merge: {developers_can_merge}\n", logging.INFO)
 
     def __displayAccessLevel(self, access_levels):
         for al in access_levels:

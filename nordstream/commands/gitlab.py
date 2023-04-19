@@ -89,7 +89,7 @@ def start(argv):
 
     elif args["--list-protections"]:
         gitLabRunner.getProjects(args["--project"])
-        gitLabRunner.listBranchProtectionRules()
+        gitLabRunner.listBranchesProtectionRules()
 
     elif args["--list-groups"]:
         gitLabRunner.getGroups(args["--group"])
