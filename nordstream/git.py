@@ -61,7 +61,16 @@ def gitUndoLastPushedCommits(branch, pushedCommitsCount):
         gitRunCommand("git reset --hard HEAD~")
 
     if pushedCommitsCount and not gitRunCommand(f"git push -f origin {branch}"):
-        logger.warning("Could not delete commit(s) pushed by the tool.")
+        logger.warning(
+            "Could not delete commit(s) pushed by the tool using hard reset and force push. Trying to revert commits."
+        )
+
+        gitRunCommand("git pull")
+        gitRunCommand(f"git revert --no-commit HEAD~{pushedCommitsCount}..")
+
+        gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
+        if pushedCommitsCount and not gitRunCommand(f"git push origin {branch}"):
+            logger.error("Error while trying to revert changes !")
 
 
 def gitDeleteRemote(branch):
