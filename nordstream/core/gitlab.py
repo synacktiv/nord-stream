@@ -137,8 +137,6 @@ class GitLabRunner:
     def __listGitLabGroupSecrets(self):
         for group in self._cicd.groups:
             try:
-                groupPath = group.get("full_path")
-                logger.info(f'"{groupPath}" secrets')
                 self.__displayGroupVariables(group)
             except Exception as e:
                 logger.error(f"Error while listing secrets for {group.name}: {e}")
@@ -168,7 +166,9 @@ class GitLabRunner:
         try:
             variables = self._cicd.listVariablesFromGroup(group)
             if len(variables) != 0:
-                logger.info("Group variables:")
+                groupPath = group.get("full_path")
+                logger.info(f'"{groupPath}" group variables:')
+
                 for variable in variables:
                     value = variable.get("value")
                     protected = variable.get("protected")

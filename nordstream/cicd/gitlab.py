@@ -117,7 +117,7 @@ class GitLab:
                 i += 1
 
             else:
-                logger.error("Error {response.status_code} while retrieving data: {url}")
+                logger.debug(f"Error {response.status_code} while retrieving data: {url}")
                 return response.status_code, response.json()
 
         return response.status_code, res
@@ -189,80 +189,61 @@ class GitLab:
     def addProject(self, project=None, filterWrite=False, strict=False):
         logger.debug(f"Checking project: {project}")
 
-        # username = self.__getLogin()
-        # response = self._session.get(f"https://gitlab.com/api/v4/users/{username}/projects", headers=self._header)
+        params = {}
 
-        i = 1
-        while True:
+        if project != None:
+            params["search_namespaces"] = True
+            params["search"] = project
 
-            params = {"per_page": 100, "page": i}
+        if filterWrite:
+            params["min_access_level"] = 30
 
-            if project != None:
-                params["search_namespaces"] = True
-                params["search"] = project
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects", params)
 
-            if filterWrite:
-                params["min_access_level"] = 30
+        if status_code == 200:
+            if len(response) == 0:
+                return
 
-            response = self._session.get(
-                f"{self._gitlabURL}/api/v4/projects",
-                headers=self._header,
-                params=params,
-                verify=self._verifyCert,
-            )
+            for p in response:
+                if strict and p.get("path_with_namespace") != project:
+                    continue
+                p = {
+                    "id": p.get("id"),
+                    "path_with_namespace": p.get("path_with_namespace"),
+                    "name": p.get("name"),
+                }
+                self._projects.append(p)
 
-            if response.status_code == 200:
-                if len(response.json()) == 0:
-                    break
-
-                for p in response.json():
-                    if strict and p.get("path_with_namespace") != project:
-                        continue
-                    p = {
-                        "id": p.get("id"),
-                        "path_with_namespace": p.get("path_with_namespace"),
-                        "name": p.get("name"),
-                    }
-                    self._projects.append(p)
-                i += 1
-            else:
-                logger.error("Error while retrieving projects")
-                logger.debug(response.json())
+        else:
+            logger.error("Error while retrieving projects")
+            logger.debug(response)
 
     def addGroups(self, group=None):
         logger.debug(f"Checking group: {group}")
 
-        i = 1
-        while True:
+        params = {"all_available": True}
 
-            params = {"per_page": 100, "page": i, "all_available": True}
+        if group != None:
+            params["search_namespaces"] = True
+            params["search"] = group
 
-            if group != None:
-                params["search_namespaces"] = True
-                params["search"] = project
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/groups", params)
 
-            response = self._session.get(
-                f"{self._gitlabURL}/api/v4/groups",
-                headers=self._header,
-                params=params,
-                verify=self._verifyCert,
-            )
+        if status_code == 200:
+            if len(response) == 0:
+                return
 
-            if response.status_code == 200:
-                if len(response.json()) == 0:
-                    break
+            for p in response:
+                p = {
+                    "id": p.get("id"),
+                    "full_path": p.get("full_path"),
+                    "name": p.get("name"),
+                }
+                self._groups.append(p)
 
-                for p in response.json():
-                    p = {
-                        "id": p.get("id"),
-                        "full_path": p.get("full_path"),
-                        "name": p.get("name"),
-                    }
-                    self._groups.append(p)
-                i += 1
-            else:
-                logger.error("Error while retrieving groups")
-                logger.debug(response.json())
+        else:
+            logger.error("Error while retrieving groups")
+            logger.debug(response)
 
     def __createOutputDir(self, name):
         # outputName = name.replace("/", "_")
@@ -350,11 +331,9 @@ class GitLab:
     def __deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        status_code, response = self.__paginatedGet(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
+        )
 
         for pipeline in response:
 
@@ -422,16 +401,13 @@ class GitLab:
 
     def getBranchesProtectionRules(self, projectId):
         logger.debug("Getting branch protection rules")
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/protected_branches",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
 
-        if response.status_code == 403:
-            raise GitLabError(response.json().get("message"))
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{projectId}/protected_branches")
 
-        return response.json()
+        if status_code == 403:
+            raise GitLabError(response.get("message"))
+
+        return response
 
     def getBranches(self, projectId):
         logger.debug("Getting branch protection rules (limited)")
@@ -441,6 +417,6 @@ class GitLab:
         )
 
         if status_code == 403:
-            raise GitLabError(response.json().get("message"))
+            raise GitLabError(response.get("message"))
 
         return response
