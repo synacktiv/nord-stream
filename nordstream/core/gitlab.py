@@ -57,7 +57,7 @@ class GitLabRunner:
 
     @yaml.setter
     def yaml(self, value):
-        self._yaml = value
+        self._yaml = realpath(value)
 
     @property
     def branchAlreadyExists(self):
@@ -128,31 +128,33 @@ class GitLabRunner:
     def __listGitLabProjectSecrets(self):
         for project in self._cicd.projects:
             try:
-                projectName = project.get("path_with_namespace")
-                logger.info(f'"{projectName}" secrets')
                 self.__displayProjectVariables(project)
             except Exception as e:
-                logger.error(f"Error while listing secrets for {project.name}: {e}")
+                logger.error(f"Error while listing secrets for {project.get('name')}: {e}")
 
     def __listGitLabGroupSecrets(self):
         for group in self._cicd.groups:
             try:
                 self.__displayGroupVariables(group)
             except Exception as e:
-                logger.error(f"Error while listing secrets for {group.name}: {e}")
+                logger.error(f"Error while listing secrets for {group.get('name')}: {e}")
 
     def __listGitLabInstanceSecrets(self):
         try:
-            logger.info("Instance secrets")
             self.__displayInstanceVariables()
         except Exception as e:
             logger.error(f"Error while listing instance secrets: {e}")
 
     def __displayProjectVariables(self, project):
+
+        projectName = project.get("path_with_namespace")
+
         try:
             variables = self._cicd.listVariablesFromProject(project)
             if len(variables) != 0:
-                logger.info("Project variables:")
+
+                logger.info(f'"{projectName}" variables')
+
                 for variable in variables:
                     value = variable.get("value")
                     protected = variable.get("protected")
@@ -160,13 +162,17 @@ class GitLabRunner:
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
         except GitLabError as e:
+            logger.info(f'"{projectName}" variables')
             logger.error(f"\t{e}")
 
     def __displayGroupVariables(self, group):
+
+        groupPath = group.get("full_path")()
+
         try:
             variables = self._cicd.listVariablesFromGroup(group)
+
             if len(variables) != 0:
-                groupPath = group.get("full_path")
                 logger.info(f'"{groupPath}" group variables:')
 
                 for variable in variables:
@@ -176,6 +182,7 @@ class GitLabRunner:
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
         except GitLabError as e:
+            logger.info(f'"{groupPath}" group variables:')
             logger.error(f"\t{e}")
 
     def __displayInstanceVariables(self):
@@ -190,6 +197,7 @@ class GitLabRunner:
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
         except GitLabError as e:
+            logger.info("Instance variables:")
             logger.error(f"\t{e}")
 
     def listGitLabProjects(self):
@@ -325,10 +333,12 @@ class GitLabRunner:
         if self._cleanLogs:
             logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
             self._cicd.cleanAllLogs(projectId)
-        if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-            gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
-        else:
-            self.__deleteRemoteBranch()
+
+        if self._pushedCommitsCount > 0:
+            if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
+                gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+            else:
+                self.__deleteRemoteBranch()
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")

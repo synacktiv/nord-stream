@@ -79,7 +79,7 @@ class DevOpsRunner:
 
     @yaml.setter
     def yaml(self, value):
-        self._yaml = value
+        self._yaml = realpath(value)
 
     @property
     def writeAccessFilter(self):

@@ -72,7 +72,7 @@ class GitHubWorkflowRunner:
 
     @yaml.setter
     def yaml(self, value):
-        self._yaml = value
+        self._yaml = realpath(value)
 
     @property
     def exploitOIDC(self):
@@ -471,10 +471,12 @@ class GitHubWorkflowRunner:
     def __clean(self, repo):
         if self._cleanLogs:
             self._cicd.cleanAllLogs(repo, self._workflowFilename)
-        if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-            gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
-        else:
-            self.__deleteRemoteBranch()
+
+        if self._pushedCommitsCount > 0:
+            if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
+                gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+            else:
+                self.__deleteRemoteBranch()
 
     def runWorkflow(self):
 
@@ -635,7 +637,7 @@ class GitHubWorkflowRunner:
         if protectionEnabled:
             logger.info(f'Found branch protection rule on "{self._cicd.branchName}" branch')
             try:
-                protection = self._cicd.getBranchProtectionRules(repo)
+                protection = self._cicd.getBranchesProtectionRules(repo)
 
                 if protection:
                     self._displayBranchProtectionRules(protection)
