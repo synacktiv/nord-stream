@@ -283,15 +283,17 @@ class GitLab:
             response[0].get("status"),
         )
 
-    def __getJobId(self, projectId, pipelineId):
+    def __getJobs(self, projectId, pipelineId):
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}/jobs",
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        status_code, response = self.__paginatedGet(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}/jobs"
+        )
 
-        return response[0].get("id")
+        if status_code == 403:
+            raise GitLabError(response.get("message"))
+
+        # reverse the list to get the first job at the first position
+        return response[::-1]
 
     def downloadPipelineOutput(self, project, pipelineId):
         projectPath = project.get("path_with_namespace")
@@ -299,7 +301,32 @@ class GitLab:
 
         projectId = project.get("id")
 
-        jobId = self.__getJobId(projectId, pipelineId)
+        jobs = self.__getJobs(projectId, pipelineId)
+
+        date = time.strftime("%Y-%m-%d_%H-%M-%S")
+        f = open(f"{self._outputDir}/{projectPath}/pipeline_{date}.log", "w")
+
+        if len(jobs) == 0:
+            return None
+
+        for job in jobs:
+
+            jobId = job.get("id")
+            jobName = job.get("name", "")
+            jobStage = job.get("stage", "")
+            jobStatus = job.get("status", "")
+
+            output = self.__getTraceForJobId(projectId, jobId)
+
+            if jobStatus != "skipped":
+                f.write(f"[+] {jobName} (stage={jobStage})\n")
+                f.write(output)
+
+        f.close()
+
+        return f"pipeline_{date}.log"
+
+    def __getTraceForJobId(self, projectId, jobId):
 
         response = self._session.get(
             f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
@@ -322,11 +349,7 @@ class GitLab:
                     logger.error("Output still no ready, error !")
                     return None
 
-        date = time.strftime("%Y-%m-%d_%H-%M-%S")
-        with open(f"{self._outputDir}/{projectPath}/pipeline_{date}.log", "w") as f:
-            f.write(response.text)
-        f.close()
-        return f"pipeline_{date}.log"
+        return response.text
 
     def __deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
@@ -420,3 +443,30 @@ class GitLab:
             raise GitLabError(response.get("message"))
 
         return response
+
+    def getFailureReasonPipeline(self, projectId, pipelineId):
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}",
+            headers=self._header,
+            verify=self._verifyCert,
+        ).json()
+
+        return response.get("yaml_errors", None)
+
+    def getFailureReasonJobs(self, projectId, pipelineId):
+
+        res = []
+        jobs = self.__getJobs(projectId, pipelineId)
+
+        for job in jobs:
+
+            failure = {}
+            failure["name"] = job.get("name", "")
+            failure["stage"] = job.get("stage", "")
+            failure["failure_reason"] = job.get("failure_reason", "")
+
+            if failure["failure_reason"] != "":
+                res.append(failure)
+
+        return res

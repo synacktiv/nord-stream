@@ -260,8 +260,7 @@ class GitLabRunner:
                 self._fileName = self._cicd.downloadPipelineOutput(project, pipelineId)
                 if self._fileName:
                     self.__extractPipelineOutput(project)
-
-                logger.empty_line()
+                    logger.empty_line()
         except Exception as e:
             logger.error(f"Error: {e}")
 
@@ -299,10 +298,9 @@ class GitLabRunner:
                     return pipelineId
 
                 elif pipelineStatus == "failed":
-                    logger.error("Pipeline has failed.")
-                    logger.error("#TODO: display failure reason")
-                    # self.__displayFailureReasons(project, runId)
-                    return None
+                    self.__displayFailureReasons(projectId, pipelineId)
+
+                return pipelineId
 
         except Exception as e:
             logger.exception(e)
@@ -461,3 +459,20 @@ class GitLabRunner:
                 res += f" (group_id={group_id})"
 
             logger.raw(f"{res}\n", logging.INFO)
+
+    def __displayFailureReasons(self, projectId, pipelineId):
+        logger.error("Pipeline has failed.")
+
+        pipelineFailure = self._cicd.getFailureReasonPipeline(projectId, pipelineId)
+        if pipelineFailure:
+            logger.error(f"{pipelineFailure}")
+        else:
+            jobsFailure = self._cicd.getFailureReasonJobs(projectId, pipelineId)
+
+            for failure in jobsFailure:
+
+                name = failure["name"]
+                stage = failure["stage"]
+                reason = failure["failure_reason"]
+
+                logger.raw(f"\t- {name}: {reason} (stage={stage})\n", logging.INFO)
