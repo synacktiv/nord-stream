@@ -74,7 +74,7 @@ class GitLab:
         # from https://docs.gitlab.com/ee/api/rest/index.html#personalprojectgroup-access-tokens
         return (
             requests.get(
-                f"{gitlabURL.strip('/')}/api/v4/projects",
+                f"{gitlabURL.strip('/')}/api/v4/user",
                 headers={"PRIVATE-TOKEN": token},
             ).status_code
             == 200
@@ -82,7 +82,7 @@ class GitLab:
 
     def __getLogin(self):
         response = self.getUser()
-        return response["username"]
+        return response.get("username", "")
 
     def getUser(self):
         logger.debug(f"Retrieving user informations")

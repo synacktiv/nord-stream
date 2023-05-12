@@ -153,7 +153,7 @@ class GitLabRunner:
             variables = self._cicd.listVariablesFromProject(project)
             if len(variables) != 0:
 
-                logger.info(f'"{projectName}" variables')
+                logger.info(f'"{projectName}" project variables')
 
                 for variable in variables:
                     value = variable.get("value")
