@@ -43,6 +43,9 @@ args
     --branch-name <name>                    Use specific branch name for deployment.
 
 Examples:
+    List all secrets from all repositories
+    $ nord-stream.py github --token "$GHP" --org myorg --list-secrets
+
     Dump all secrets from all repositories and try to disable branch protections
     $ nord-stream.py github --token "$GHP" --org myorg --disable-protections
 

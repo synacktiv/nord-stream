@@ -32,6 +32,9 @@ args
     --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github
 
 Examples:
+    List all secrets from all projects
+    $ nord-stream.py devops --token "$PAT" --org myorg --list-secrets
+
     Dump all secrets from all projects
     $ nord-stream.py devops --token "$PAT" --org myorg
 
