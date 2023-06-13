@@ -77,6 +77,7 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
+
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
     nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --branch-name <name> --no-clean]
@@ -126,6 +127,7 @@ Examples:
     $ nord-stream.py github --token "$GHP" --org myorg --disable-protections
 
 Authors: @hugow @0hexit
+
 ```
 
 ### GitLab
