@@ -71,7 +71,7 @@ Authors: @hugow @0hexit
 ### GitHub
 
 ```
-python3 nord-stream.py github -h
+$ python3 nord-stream.py github -h
 CICD pipeline exploitation tool
 
 Usage:
@@ -133,7 +133,7 @@ Authors: @hugow @0hexit
 ### GitLab
 
 ```
-python3 nord-stream.py gitlab -h
+$ python3 nord-stream.py gitlab -h
 CICD pipeline exploitation tool
 
 Usage:
