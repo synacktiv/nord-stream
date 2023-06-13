@@ -33,6 +33,13 @@ args
     --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
     --describe-token                        Display information on the token
+
+Examples:
+    Dump all secrets
+    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
+
+    Deploy the custom pipeline on the master branch
+    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master
 """
 
 from docopt import docopt

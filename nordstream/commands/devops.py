@@ -36,6 +36,9 @@ args
     --describe-token                        Display information on the token
 
 Examples:
+    List all secrets from all projects
+    $ nord-stream.py devops --token "$PAT" --org myorg --list-secrets
+
     Dump all secrets from all projects
     $ nord-stream.py devops --token "$PAT" --org myorg
 
