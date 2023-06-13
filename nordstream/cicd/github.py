@@ -70,9 +70,11 @@ class GitHub:
         self._outputDir = value
 
     def __getLogin(self):
-        logger.debug("Getting user login")
-        response = self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header).json()
-        return response.get("login")
+        return self.getUser().get("login")
+
+    def getUser(self):
+        logger.debug("Retrieving user informations")
+        return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header).json()
 
     def listRepos(self):
         logger.debug("Listing repos")
@@ -485,6 +487,7 @@ class GitHub:
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
         with open(f"{self._outputDir}/{repo}/workflow_{name}_{date}.zip", "wb") as f:
             f.write(zipFile.content)
+        f.close()
         return f"workflow_{name}_{date}.zip"
 
     def getFailureReason(self, repo, workflowId):

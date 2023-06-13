@@ -27,6 +27,7 @@ class GitHubWorkflowRunner:
     _writeAccessFilter = False
     _branchAlreadyExists = False
     _pushedCommitsCount = 0
+    _cleanLogs = True
 
     def __init__(self, cicd, env):
         self._cicd = cicd
@@ -71,7 +72,7 @@ class GitHubWorkflowRunner:
 
     @yaml.setter
     def yaml(self, value):
-        self._yaml = value
+        self._yaml = realpath(value)
 
     @property
     def exploitOIDC(self):
@@ -144,6 +145,14 @@ class GitHubWorkflowRunner:
     @forceDeploy.setter
     def forceDeploy(self, value):
         self._forceDeploy = value
+
+    @property
+    def cleanLogs(self):
+        return self._cleanLogs
+
+    @cleanLogs.setter
+    def cleanLogs(self, value):
+        self._cleanLogs = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/github"
@@ -282,9 +291,16 @@ class GitHubWorkflowRunner:
         pushOutput.wait()
 
         try:
-            if pushOutput.returncode != 0 or pushOutput.communicate()[1].strip() == b"Everything up-to-date":
+            if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+                logger.error("Error when pushing code: Everything up-to-date")
+                logger.warning(
+                    "Your trying to push the same code on an existing branch, modify the yaml file to push it."
+                )
+
+            elif pushOutput.returncode != 0:
                 logger.error("Error when pushing code:")
                 logger.raw(pushOutput.communicate()[1], logging.INFO)
+
             else:
                 self._pushedCommitsCount += 1
 
@@ -453,13 +469,17 @@ class GitHubWorkflowRunner:
             logger.raw(deleteOutput.communicate()[1], logging.INFO)
 
     def __clean(self, repo):
-        self._cicd.cleanAllLogs(repo, self._workflowFilename)
-        if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-            gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
-        else:
-            self.__deleteRemoteBranch()
+        if self._cleanLogs:
+            self._cicd.cleanAllLogs(repo, self._workflowFilename)
+
+        if self._pushedCommitsCount > 0:
+            if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
+                gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+            else:
+                self.__deleteRemoteBranch()
 
     def runWorkflow(self):
+
         for repo in self._cicd.repos:
             logger.success(f'"{repo}"')
 
@@ -617,7 +637,7 @@ class GitHubWorkflowRunner:
         if protectionEnabled:
             logger.info(f'Found branch protection rule on "{self._cicd.branchName}" branch')
             try:
-                protection = self._cicd.getBranchProtectionRules(repo)
+                protection = self._cicd.getBranchesProtectionRules(repo)
 
                 if protection:
                     self._displayBranchProtectionRules(protection)
@@ -711,3 +731,30 @@ class GitHubWorkflowRunner:
         if policyId is not None:
             self._cicd.deleteDeploymentBranchPolicy(repo, env)
         self._cicd.modifyEnvProtectionRules(repo, env, waitTime, reviewers, branchPolicy)
+
+    def describeToken(self):
+        response = self._cicd.getUser()
+        logger.info("Token information:")
+
+        login = response.get("login")
+        if login != None:
+            logger.raw(f"\t- Login: {login}\n", logging.INFO)
+
+        isAdmin = response.get("site_admin")
+        logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+
+        email = response.get("email")
+        if email != None:
+            logger.raw(f"\t- Email: {email}\n", logging.INFO)
+
+        id = response.get("id")
+        if id != None:
+            logger.raw(f"\t- Id: {id}\n", logging.INFO)
+
+        bio = response.get("bio")
+        if bio != "":
+            logger.raw(f"\t- Bio: {bio}\n", logging.INFO)
+
+        company = response.get("company")
+        if company != None:
+            logger.raw(f"\t- Company: {company}\n", logging.INFO)

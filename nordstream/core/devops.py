@@ -18,7 +18,7 @@ class DevOpsRunner:
     _writeAccessFilter = False
     _pipelineFilename = "azure-pipeline.yaml"
     _output = None
-    _clean = True
+    _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
 
     def __init__(self, cicd):
@@ -66,12 +66,12 @@ class DevOpsRunner:
         self._output = value
 
     @property
-    def clean(self):
-        return self._clean
+    def cleanLogs(self):
+        return self._cleanLogs
 
-    @clean.setter
-    def clean(self, value):
-        self._clean = value
+    @cleanLogs.setter
+    def cleanLogs(self, value):
+        self._cleanLogs = value
 
     @property
     def yaml(self):
@@ -79,7 +79,7 @@ class DevOpsRunner:
 
     @yaml.setter
     def yaml(self, value):
-        self._yaml = value
+        self._yaml = realpath(value)
 
     @property
     def writeAccessFilter(self):
@@ -241,9 +241,16 @@ class DevOpsRunner:
         pushOutput.wait()
 
         try:
-            if pushOutput.returncode != 0:
+            if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+                logger.error("Error when pushing code: Everything up-to-date")
+                logger.warning(
+                    "Your trying to push the same code on an existing branch, modify the yaml file to push it."
+                )
+
+            elif pushOutput.returncode != 0:
                 logger.error("Error when pushing code:")
                 logger.raw(pushOutput.communicate()[1], logging.INFO)
+
             else:
                 logger.raw(pushOutput.communicate()[1])
                 runId = self._cicd.runPipeline(project, pipelineId)
@@ -380,7 +387,9 @@ class DevOpsRunner:
     def manualCleanLogs(self):
         logger.info("Deleting logs")
         for project in self._cicd.projects:
-            self._cicd.cleanAllLogs(project.get("id"))
+            projectId = project.get("id")
+            logger.info(f"Cleaning logs for project: {projectId}")
+            self._cicd.cleanAllLogs(projectId)
 
     def __runSecretsExtractionPipeline(self, projectId, pipelineId):
         if self._extractVariableGroups:
@@ -434,13 +443,14 @@ class DevOpsRunner:
         #    logger.raw(deleteOutput.communicate()[1], logging.INFO)
 
     def __clean(self, projectId, repoId, deleteRemoteRepo):
-        if self._clean:
+        if self._cleanLogs:
+            logger.info(f"Cleaning logs for project: {projectId}")
             self._cicd.cleanAllLogs(projectId)
-            if deleteRemoteRepo:
-                logger.info("Deleting remote repository")
-                self._cicd.deleteGit(projectId, repoId)
-            else:
-                self.__deleteRemoteBranch()
+        if deleteRemoteRepo:
+            logger.info("Deleting remote repository")
+            self._cicd.deleteGit(projectId, repoId)
+        else:
+            self.__deleteRemoteBranch()
 
     def __createPipeline(self, projectId, repoId):
         logger.info("Creating pipeline")
@@ -455,7 +465,7 @@ class DevOpsRunner:
                     return pipeline.get("id")
             raise Exception("unable to create a pipeline")
 
-    def __runsCustomPipeline(self, projectId, pipelineId):
+    def __runCustomPipeline(self, projectId, pipelineId):
         pipelineGenerator = DevOpsPipelineGenerator()
         pipelineGenerator.loadFile(self._yaml)
 
@@ -499,7 +509,7 @@ class DevOpsRunner:
                 pipelineId = self.__createPipeline(projectId, repoId)
 
                 if self._yaml:
-                    self.__runsCustomPipeline(projectId, pipelineId)
+                    self.__runCustomPipeline(projectId, pipelineId)
                 else:
                     self.__runSecretsExtractionPipeline(projectId, pipelineId)
 
@@ -512,3 +522,15 @@ class DevOpsRunner:
                 self.__clean(projectId, repoId, deleteRemoteRepo)
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{self._cicd.repoName}", shell=True).wait()
+
+    def describeToken(self):
+        response = self._cicd.getUser()
+        logger.info("Token information:")
+
+        username = response.get("authenticatedUser").get("properties").get("Account").get("$value")
+        if username != "":
+            logger.raw(f"\t- Username: {username}\n", logging.INFO)
+
+        id = response.get("authenticatedUser").get("id")
+        if id != "":
+            logger.raw(f"\t- Id: {id}\n", logging.INFO)
