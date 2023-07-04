@@ -6,7 +6,8 @@ Usage:
     nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
-    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo>]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
@@ -32,10 +33,12 @@ args
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
     --no-org                                Don't extract organization secrets.
-    --exploit-oidc                          Generate an access token for a cloud provider using an existing OIDC trust between a cloud role and a GitHub workflow (supports only Azure for now).
+    --exploit-oidc                          Generate access tokens or credentials for a cloud provider using an existing OIDC trust between a cloud role and a GitHub workflow (supports only Azure and AWS for now).
     --azure-tenant-id <tenant>              Identifier of the Azure tenant associated with the application having federated credentials.
     --azure-subscription-id <subscription>  Identifier of the Azure subscription associated with the application having federated credentials.
     --azure-client-id <client>              Identifier of the Azure application (client) associated with the application having federated credentials.
+    --aws-role <role>                       AWS role to assume.
+    --aws-region <region>                   AWS region.
     --list-protections                      List all protections.
     --list-repos                            List all repos.
     --list-secrets                          List all secrets.
@@ -109,6 +112,10 @@ def start(argv):
         gitHubWorkflowRunner.subscriptionId = args["--azure-subscription-id"]
     if args["--azure-client-id"]:
         gitHubWorkflowRunner.clientId = args["--azure-client-id"]
+    if args["--aws-role"]:
+        gitHubWorkflowRunner.role = args["--aws-role"]
+    if args["--aws-region"]:
+        gitHubWorkflowRunner.region = args["--aws-region"]
     if args["--no-clean"]:
         gitHubWorkflowRunner.cleanLogs = not args["--no-clean"]
 
