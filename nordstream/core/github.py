@@ -337,9 +337,17 @@ class GitHubWorkflowRunner:
         logger.info("Listing secrets:")
         for repo in self._cicd.repos:
             try:
-                self.__displayRepoSecrets(repo)
-                self.__displayEnvSecrets(repo)
-                self.__displayOrgSecrets(repo)
+                logger.info(f'"{repo}" secrets')
+
+                if self._extractRepo:
+                    self.__displayRepoSecrets(repo)
+
+                if self._extractEnv:
+                    self.__displayEnvSecrets(repo)
+
+                if self._extractOrg:
+                    self.__displayOrgSecrets(repo)
+
             except Exception:
                 logger.error("Need write acccess on the repo.")
 

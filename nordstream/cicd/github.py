@@ -21,6 +21,7 @@ class GitHub:
     _outputDir = "nord-stream-logs"
     _sleepTime = 15
     _maxRetry = 10
+    _isGHSToken = False
 
     def __init__(self, token):
         self._token = token
@@ -31,6 +32,12 @@ class GitHub:
     @staticmethod
     def checkToken(token):
         logger.verbose(f"Checking token: {token}")
+        if token.lower().startswith("ghs_"):
+            logger.warning(
+                "You are using a GHS token this will break some part of this tool. Some research must be done with this particular type of token."
+            )
+            self._isGHSToken = True
+            return True
         return requests.get(f"https://api.github.com/user", auth=("foo", token)).status_code == 200
 
     @property
@@ -81,9 +88,16 @@ class GitHub:
         page = 1
         # Github pagination
         while True:
+
             params = {"page": page}
+
+            if self._isGHSToken:
+                url = (f"https://api.github.com/orgs/{self._org}/repos",)
+            else:
+                url = f"https://api.github.com/user/repos"
+
             response = self._session.get(
-                f"https://api.github.com/user/repos",
+                url,
                 params=params,
                 auth=self._auth,
                 headers=self._header,
@@ -317,7 +331,7 @@ class GitHub:
             raise GitHubError(response.get("message"))
         return response.get("protected")
 
-    def getBranchProtectionRules(self, repo):
+    def getBranchesProtectionRules(self, repo):
         logger.debug("Getting branch protection rules")
         response = self._session.get(
             f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
@@ -335,7 +349,7 @@ class GitHub:
 
         # TODO: might be a good idea to check all deployments with pagination
         for deployment in response:
-            if deployment.get("creator").get("login").lower() != self._githubLogin.lower():
+            if not self._isGHSToken and deployment.get("creator").get("login").lower() != self._githubLogin.lower():
                 continue
 
             commit = self._session.get(

@@ -8,7 +8,7 @@ Usage:
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
     nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo>]
+    nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream.py github [options] --token <ghp> --describe-token
 
