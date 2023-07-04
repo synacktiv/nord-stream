@@ -22,6 +22,8 @@ class GitHubWorkflowRunner:
     _tenantId = None
     _subscriptionId = None
     _clientId = None
+    _role = None
+    _region = None
     _forceDeploy = False
     _disableProtections = None
     _writeAccessFilter = False
@@ -105,6 +107,22 @@ class GitHubWorkflowRunner:
     @clientId.setter
     def clientId(self, value):
         self._clientId = value
+
+    @property
+    def role(self):
+        return self._role
+
+    @role.setter
+    def role(self, value):
+        self._role = value
+
+    @property
+    def region(self):
+        return self._region
+
+    @region.setter
+    def region(self, value):
+        self._region = value
 
     @property
     def disableProtections(self):
@@ -431,12 +449,17 @@ class GitHubWorkflowRunner:
 
     def __runOIDCTokenGenerationWorfklow(self, repo):
         # FIXME: factorize code
-        logger.info("Running OIDC access token generation workflow")
-
         workflowGenerator = WorkflowGenerator()
-        workflowGenerator.generateWorkflowForOIDCTokenGeneration(
-            self._tenantId, self._subscriptionId, self._clientId, self._env
-        )
+        if self._tenantId is not None and self._subscriptionId is not None and self._clientId is not None:
+            logger.info("Running OIDC Azure access tokens generation workflow")
+            informationType = "OIDC access tokens"
+            workflowGenerator.generateWorkflowForOIDCAzureTokenGeneration(
+                self._tenantId, self._subscriptionId, self._clientId, self._env
+            )
+        else:
+            logger.info("Running OIDC AWS credentials generation workflow")
+            informationType = "OIDC credentials"
+            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self._role, self._region, self._env)
 
         policyId = waitTime = reviewers = branchPolicy = None
 
@@ -450,7 +473,7 @@ class GitHubWorkflowRunner:
                 ) = self.__checkAndDisableEnvProtections(repo, self._env)
 
             if self.__launchWorkflow(repo, workflowGenerator, "oidc"):
-                self.__extractSensitiveInformationFromWorkflowResult(repo, informationType="OIDC access tokens")
+                self.__extractSensitiveInformationFromWorkflowResult(repo, informationType=informationType)
         except Exception as e:
             logger.error(f"Error: {e}")
 
@@ -551,7 +574,7 @@ class GitHubWorkflowRunner:
                     logger.raw(f"\t- timer: {wait} min\n", logging.INFO)
                 else:
                     branchPolicy = envDetails.get("deployment_branch_policy")
-                    if branchPolicy.get("custom_branch_policies"):
+                    if branchPolicy.get("custom_branch_policies", False):
                         logger.raw(f"\t- deployment branch policy: custom\n", logging.INFO)
                     else:
                         logger.raw(f"\t- deployment branch policy: protected\n", logging.INFO)
@@ -707,7 +730,7 @@ class GitHubWorkflowRunner:
 
             try:
                 logger.info("Modifying protections")
-                if branchPolicy:
+                if branchPolicy and branchPolicy.get("custom_branch_policies", False):
                     policyId = self._cicd.createDeploymentBranchPolicy(repo, env)
 
                 for protection in protectionRules:

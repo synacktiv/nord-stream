@@ -20,7 +20,7 @@ class WorkflowGenerator(YamlGeneratorBase):
         },
     }
 
-    _OIDCTokenTemplate = {
+    _OIDCAzureTokenTemplate = {
         "name": "GitHub Actions",
         "on": "push",
         "permissions": {"id-token": "write", "contents": "read"},
@@ -43,14 +43,44 @@ class WorkflowGenerator(YamlGeneratorBase):
         },
     }
 
+    _OIDCAWSTokenTemplate = {
+        "name": "GitHub Actions",
+        "on": "push",
+        "permissions": {"id-token": "write", "contents": "read"},
+        "jobs": {
+            "init": {
+                "runs-on": "ubuntu-latest",
+                "environment": None,
+                "steps": [
+                    {
+                        "name": "login",
+                        "uses": "aws-actions/configure-aws-credentials@v1-node16",
+                        "with": {"role-to-assume": None, "role-session-name": "oidcrolesession", "aws-region": None},
+                    },
+                    {
+                        "name": "commands",
+                        "run": "sh -c 'env | grep \"^AWS_\" | base64 -w0 | base64 -w0'",
+                    },
+                ],
+            }
+        },
+    }
+
     def generateWorkflowForSecretsExtraction(self, secrets, env=None):
         self.addSecretsToYaml(secrets)
         if env is not None:
             self.addEnvToYaml(env)
 
-    def generateWorkflowForOIDCTokenGeneration(self, tenant, subscription, client, env=None):
-        self._defaultTemplate = self._OIDCTokenTemplate
+    def generateWorkflowForOIDCAzureTokenGeneration(self, tenant, subscription, client, env=None):
+        self._defaultTemplate = self._OIDCAzureTokenTemplate
         self.addAzureInfoForOIDCToYaml(tenant, subscription, client)
+
+        if env is not None:
+            self.addEnvToYaml(env)
+
+    def generateWorkflowForOIDCAWSTokenGeneration(self, role, region, env=None):
+        self._defaultTemplate = self._OIDCAWSTokenTemplate
+        self.addAWSInfoForOIDCToYaml(role, region)
 
         if env is not None:
             self.addEnvToYaml(env)
@@ -78,3 +108,7 @@ class WorkflowGenerator(YamlGeneratorBase):
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["tenant-id"] = tenant
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["subscription-id"] = subscription
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["client-id"] = client
+
+    def addAWSInfoForOIDCToYaml(self, role, region):
+        self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["role-to-assume"] = role
+        self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["aws-region"] = region
