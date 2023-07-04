@@ -2,8 +2,8 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean]
+    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
@@ -16,6 +16,11 @@ Options:
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
+
+Signing:
+    --key-id <id>                           GPG primary key ID
+    --user <user>                           User used to sign commits
+    --email <email>                         Email address used to sign commits
 
 args
     --token <pat>                           Azure DevOps personal token
@@ -49,6 +54,7 @@ from docopt import docopt
 from nordstream.cicd.devops import DevOps
 from nordstream.core.devops import DevOpsRunner
 from nordstream.utils.log import logger, NordStreamLog
+from nordstream.git import Git
 
 
 def start(argv):
@@ -70,6 +76,14 @@ def start(argv):
     if args["--output-dir"]:
         devops.outputDir = args["--output-dir"] + "/"
     devopsRunner = DevOpsRunner(devops)
+
+    git = Git()
+    if args["--key-id"]:
+        git.keyId = args["--key-id"]
+        git.user = args["--user"]
+        git.email = args["--email"]
+
+    devopsRunner.git = git
 
     if args["--yaml"]:
         devopsRunner.yaml = args["--yaml"]

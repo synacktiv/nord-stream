@@ -4,7 +4,7 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections)[--project <project> --group <group> --no-project --no-group --no-instance]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream.py gitlab [options] --token <pat> --describe-token
 
@@ -15,6 +15,11 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
+
+Signing:
+    --key-id <id>                           GPG primary key ID
+    --user <user>                           User used to sign commits
+    --email <email>                         Email address used to sign commits
 
 args
     --token <pat>                           GitLab personal token
@@ -46,6 +51,7 @@ from docopt import docopt
 from nordstream.cicd.gitlab import GitLab
 from nordstream.core.gitlab import GitLabRunner
 from nordstream.utils.log import logger, NordStreamLog
+from nordstream.git import Git
 
 
 def start(argv):
@@ -67,6 +73,14 @@ def start(argv):
     if args["--output-dir"]:
         gitlab.outputDir = args["--output-dir"] + "/"
     gitLabRunner = GitLabRunner(gitlab)
+
+    git = Git()
+    if args["--key-id"]:
+        git.keyId = args["--key-id"]
+        git.user = args["--user"]
+        git.email = args["--email"]
+
+    gitLabRunner.git = git
 
     if args["--branch-name"]:
         gitlab.branchName = args["--branch-name"]

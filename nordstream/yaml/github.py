@@ -11,7 +11,7 @@ class WorkflowGenerator(YamlGeneratorBase):
                 "runs-on": "ubuntu-latest",
                 "steps": [
                     {
-                        "run": "sh -c 'env | grep \"^secret_\" | base64 -w0 | base64 -w0'",
+                        "run": "sh -c 'env | base64 -w0 | base64 -w0'",
                         "name": "command",
                         "env": None,
                     }

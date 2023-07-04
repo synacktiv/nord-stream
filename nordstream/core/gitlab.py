@@ -18,6 +18,7 @@ class GitLabRunner:
     _branchAlreadyExists = False
     _fileName = None
     _cleanLogs = True
+    _git = None
 
     @property
     def writeAccessFilter(self):
@@ -74,6 +75,14 @@ class GitLabRunner:
     @cleanLogs.setter
     def cleanLogs(self, value):
         self._cleanLogs = value
+
+    @property
+    def git(self):
+        return self._git
+
+    @git.setter
+    def git(self, value):
+        self._git = value
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -219,12 +228,12 @@ class GitLabRunner:
 
             domain = urlparse(self._cicd.url).netloc
             url = f"https://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
-            gitClone(url)
+            self._git.gitClone(url)
 
             chdir(repoShortName)
             self._pushedCommitsCount = 0
-            self._branchAlreadyExists = gitRemoteBranchExists(self._cicd.branchName)
-            gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+            self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
+            self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
                 # TODO: branch protections
@@ -273,7 +282,7 @@ class GitLabRunner:
         projectId = project.get("id")
 
         pipelineGenerator.writeFile(f".gitlab-ci.yml")
-        pushOutput = gitPush(self._cicd.branchName)
+        pushOutput = self._git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -334,7 +343,7 @@ class GitLabRunner:
 
         if self._pushedCommitsCount > 0:
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-                gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+                self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
                 self.__deleteRemoteBranch()
 
@@ -346,7 +355,7 @@ class GitLabRunner:
 
     def __deleteRemoteBranch(self):
         logger.info("Deleting remote branch")
-        gitCleanRemote(self._cicd.branchName)
+        self._git.gitCleanRemote(self._cicd.branchName)
 
     def describeToken(self):
         response = self._cicd.getUser()

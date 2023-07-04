@@ -11,147 +11,165 @@ Return True if the command succeeds (returns 0), else return False.
 
 ATTACK_COMMIT_MSG = "Test deployment"
 CLEAN_COMMIT_MSG = "Remove test deployment"
-LOCAL_USERNAME = "nord-stream"
-LOCAL_EMAIL = "nord-stream@localhost.com"
 
 
-def gitRunCommand(command):
-    try:
-        # debug level
-        if logger.level <= 10:
-            logger.debug(f"Running: {command}")
-            subprocess.run(command, shell=True, check=True)
-        else:
-            subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        return False
-    return True
+class Git:
 
+    _user = "nord-stream"
+    _email = "nord-stream@localhost.com"
+    _keyId = None
 
-def gitInitialization(branch, branchAlreadyExists=False):
-    logger.verbose("Git init")
+    @property
+    def email(self):
+        return self._email
 
-    gitRunCommand(f"git config user.Name {LOCAL_USERNAME}")
-    gitRunCommand(f"git config user.email {LOCAL_EMAIL}")
+    @email.setter
+    def email(self, email):
+        self._email = email
 
-    if branchAlreadyExists:
-        gitRunCommand(f"git checkout {branch}")
-        return
+    @property
+    def user(self):
+        return self._user
 
-    gitRunCommand(f"git checkout --orphan {branch}")
-    gitRunCommand(f"git pull origin {branch}")
-    gitRunCommand("git rm . -rf")
+    @user.setter
+    def user(self, user):
+        self._user = user
 
+    @property
+    def keyId(self):
+        return self._keyId
 
-def gitCleanRemote(branch):
-    logger.verbose("Cleaning remote branch")
-    gitRunCommand("git rm . -rf")
-    gitRunCommand("git rm .github/ -rf")
-    gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
-    gitRunCommand(f"git push -d origin {branch}")
+    @keyId.setter
+    def keyId(self, keyId):
+        self._keyId = keyId
 
+    def gitRunCommand(self, command):
+        try:
+            # debug level
+            if logger.level <= 10:
+                logger.debug(f"Running: {command}")
+                subprocess.run(command, shell=True, check=True)
+            else:
+                subprocess.run(command, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError:
+            return False
+        return True
 
-def gitRemoteBranchExists(branch):
-    logger.verbose("Checking if remote branch exists")
-    return gitRunCommand(f"git ls-remote --exit-code origin {branch}")
+    def gitInitialization(self, branch, branchAlreadyExists=False):
+        logger.verbose("Git init")
 
+        self.gitRunCommand(f"git config user.Name {self._user}")
+        self.gitRunCommand(f"git config user.email {self._email}")
 
-def gitUndoLastPushedCommits(branch, pushedCommitsCount):
-    for _ in range(pushedCommitsCount):
-        gitRunCommand("git reset --hard HEAD~")
+        if self._keyId != None:
+            self.gitRunCommand(f"git config user.signingkey {self._keyId}")
+            self.gitRunCommand(f"git config commit.gpgsign true")
 
-    if pushedCommitsCount and not gitRunCommand(f"git push -f origin {branch}"):
-        logger.warning(
-            "Could not delete commit(s) pushed by the tool using hard reset and force push. Trying to revert commits."
-        )
+        if branchAlreadyExists:
+            self.gitRunCommand(f"git checkout {branch}")
+            return
 
-        gitRunCommand("git pull")
-        gitRunCommand(f"git revert --no-commit HEAD~{pushedCommitsCount}..")
+        self.gitRunCommand(f"git checkout --orphan {branch}")
+        self.gitRunCommand(f"git pull origin {branch}")
+        self.gitRunCommand("git rm . -rf")
 
-        gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
-        if pushedCommitsCount and not gitRunCommand(f"git push origin {branch}"):
-            logger.error("Error while trying to revert changes !")
+    def gitCleanRemote(self, branch):
+        logger.verbose("Cleaning remote branch")
+        self.gitRunCommand("git rm . -rf")
+        self.gitRunCommand("git rm .github/ -rf")
+        self.gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
+        self.gitRunCommand(f"git push -d origin {branch}")
 
+    def gitRemoteBranchExists(self, branch):
+        logger.verbose("Checking if remote branch exists")
+        return self.gitRunCommand(f"git ls-remote --exit-code origin {branch}")
 
-def gitDeleteRemote(branch):
-    logger.verbose("Git delete remote.")
-    return subprocess.Popen(
-        f"git push -d origin {branch}",
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    def gitUndoLastPushedCommits(self, branch, pushedCommitsCount):
+        for _ in range(pushedCommitsCount):
+            self.gitRunCommand("git reset --hard HEAD~")
 
+        if pushedCommitsCount and not self.gitRunCommand(f"git push -f origin {branch}"):
+            logger.warning(
+                "Could not delete commit(s) pushed by the tool using hard reset and force push. Trying to revert commits."
+            )
 
-def gitPush(branch):
-    logger.verbose("Pushing to remote branch")
-    gitRunCommand("git add .")
-    gitRunCommand(f"git commit -m '{ATTACK_COMMIT_MSG}'")
-    return subprocess.Popen(
-        f"git push origin {branch}",
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+            self.gitRunCommand("git pull")
+            self.gitRunCommand(f"git revert --no-commit HEAD~{pushedCommitsCount}..")
 
+            self.gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
+            if pushedCommitsCount and not self.gitRunCommand(f"git push origin {branch}"):
+                logger.error("Error while trying to revert changes !")
 
-def gitCreateEmptyFile(file):
-    gitRunCommand(f"touch {file}")
-
-
-def gitMvFile(src, dest):
-    gitRunCommand(f"mv {src} {dest}")
-
-
-def gitCpFile(src, dest):
-    gitRunCommand(f"cp {src} {dest}")
-
-
-def gitCreateDir(directory):
-    gitRunCommand(f"mkdir -p {directory}")
-
-
-def gitClone(url):
-    gitRunCommand(f"git clone {url}")
-
-
-def gitGetCurrentBranch():
-    return (
-        subprocess.Popen(
-            "git rev-parse --abbrev-ref HEAD | tr -d '\n'",
+    def gitDeleteRemote(self, branch):
+        logger.verbose("Git delete remote.")
+        return subprocess.Popen(
+            f"git push -d origin {branch}",
             shell=True,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        .communicate()[0]
-        .decode("UTF-8")
-    )
 
+    def gitPush(self, branch):
+        logger.verbose("Pushing to remote branch")
+        self.gitRunCommand("git add .")
+        self.gitRunCommand(f"git commit -m '{ATTACK_COMMIT_MSG}'")
+        return subprocess.Popen(
+            f"git push origin {branch}",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
-# not needed anymore
-def gitIsGloalUserConfigured():
-    res = subprocess.Popen(
-        "git config --global user.Name",
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    res.wait()
-    if res.returncode != 0:
-        return False
+    def gitCreateEmptyFile(self, file):
+        self.gitRunCommand(f"touch {file}")
 
-    return True
+    def gitMvFile(self, src, dest):
+        self.gitRunCommand(f"mv {src} {dest}")
 
+    def gitCpFile(self, src, dest):
+        self.gitRunCommand(f"cp {src} {dest}")
 
-# not needed anymore
-def gitIsGloalEmailConfigured():
-    res = subprocess.Popen(
-        "git config --global user.email",
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    res.wait()
-    if res.returncode != 0:
-        return False
+    def gitCreateDir(self, directory):
+        self.gitRunCommand(f"mkdir -p {directory}")
 
-    return True
+    def gitClone(self, url):
+        self.gitRunCommand(f"git clone {url}")
+
+    def gitGetCurrentBranch(self):
+        return (
+            subprocess.Popen(
+                "git rev-parse --abbrev-ref HEAD | tr -d '\n'",
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
+            .communicate()[0]
+            .decode("UTF-8")
+        )
+
+    # not needed anymore
+    def gitIsGloalUserConfigured(self):
+        res = subprocess.Popen(
+            "git config --global user.Name",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        res.wait()
+        if res.returncode != 0:
+            return False
+
+        return True
+
+    # not needed anymore
+    def gitIsGloalEmailConfigured(self):
+        res = subprocess.Popen(
+            "git config --global user.email",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        res.wait()
+        if res.returncode != 0:
+            return False
+
+        return True

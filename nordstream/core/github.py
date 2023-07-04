@@ -30,6 +30,7 @@ class GitHubWorkflowRunner:
     _branchAlreadyExists = False
     _pushedCommitsCount = 0
     _cleanLogs = True
+    _git = None
 
     def __init__(self, cicd, env):
         self._cicd = cicd
@@ -172,6 +173,14 @@ class GitHubWorkflowRunner:
     def cleanLogs(self, value):
         self._cleanLogs = value
 
+    @property
+    def git(self):
+        return self._git
+
+    @git.setter
+    def git(self, value):
+        self._git = value
+
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/github"
         makedirs(self._cicd.outputDir, exist_ok=True)
@@ -305,7 +314,7 @@ class GitHubWorkflowRunner:
 
         workflowGenerator.writeFile(f".github/workflows/{self._workflowFilename}")
 
-        pushOutput = gitPush(self._cicd.branchName)
+        pushOutput = self._git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -491,8 +500,8 @@ class GitHubWorkflowRunner:
 
     def __deleteRemoteBranch(self):
         logger.verbose("Deleting remote branch")
-        # gitCleanRemote(self._cicd.branchName)
-        deleteOutput = gitDeleteRemote(self._cicd.branchName)
+        # self._git.gitCleanRemote(self._cicd.branchName)
+        deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
         deleteOutput.wait()
 
         if deleteOutput.returncode != 0:
@@ -505,7 +514,7 @@ class GitHubWorkflowRunner:
 
         if self._pushedCommitsCount > 0:
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-                gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+                self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
                 self.__deleteRemoteBranch()
 
@@ -515,13 +524,13 @@ class GitHubWorkflowRunner:
             logger.success(f'"{repo}"')
 
             url = f"https://foo:{self._cicd.token}@github.com/{repo}"
-            gitClone(url)
+            self._git.gitClone(url)
 
             repoShortName = repo.split("/")[1]
             chdir(repoShortName)
             self._pushedCommitsCount = 0
-            self._branchAlreadyExists = gitRemoteBranchExists(self._cicd.branchName)
-            gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+            self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
+            self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
                 if not self._forceDeploy:
@@ -594,8 +603,8 @@ class GitHubWorkflowRunner:
             pass
 
         if not protectionEnabled:
-            gitCreateEmptyFile("test_push.md")
-            pushOutput = gitPush(self._cicd.branchName)
+            self._git.gitCreateEmptyFile("test_push.md")
+            pushOutput = self._git.gitPush(self._cicd.branchName)
             pushOutput.wait()
 
             if pushOutput.returncode != 0:
@@ -698,13 +707,13 @@ class GitHubWorkflowRunner:
             protectionEnabled = False
 
             url = f"https://foo:{self._cicd.token}@github.com/{repo}"
-            gitClone(url)
+            self._git.gitClone(url)
 
             repoShortName = repo.split("/")[1]
             chdir(repoShortName)
             self._pushedCommitsCount = 0
-            self._branchAlreadyExists = gitRemoteBranchExists(self._cicd.branchName)
-            gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+            self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
+            self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
                 self.__checkAndDisableBranchProtectionRules(repo)

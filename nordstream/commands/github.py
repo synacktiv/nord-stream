@@ -2,13 +2,13 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
-    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --exploit-oidc --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections]
+    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream.py github [options] --token <ghp> --describe-token
@@ -19,6 +19,11 @@ Options:
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
+
+Signing:
+    --key-id <id>                           GPG primary key ID
+    --user <user>                           User used to sign commits
+    --email <email>                         Email address used to sign commits
 
 args
     --token <ghp>                           Github personal token
@@ -33,12 +38,11 @@ args
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
     --no-org                                Don't extract organization secrets.
-    --exploit-oidc                          Generate access tokens or credentials for a cloud provider using an existing OIDC trust between a cloud role and a GitHub workflow (supports only Azure and AWS for now).
-    --azure-tenant-id <tenant>              Identifier of the Azure tenant associated with the application having federated credentials.
-    --azure-subscription-id <subscription>  Identifier of the Azure subscription associated with the application having federated credentials.
-    --azure-client-id <client>              Identifier of the Azure application (client) associated with the application having federated credentials.
-    --aws-role <role>                       AWS role to assume.
-    --aws-region <region>                   AWS region.
+    --azure-tenant-id <tenant>              Identifier of the Azure tenant associated with the application having federated credentials (OIDC related).
+    --azure-subscription-id <subscription>  Identifier of the Azure subscription associated with the application having federated credentials (OIDC related).
+    --azure-client-id <client>              Identifier of the Azure application (client) associated with the application having federated credentials (OIDC related).
+    --aws-role <role>                       AWS role to assume (OIDC related).
+    --aws-region <region>                   AWS region (OIDC related).
     --list-protections                      List all protections.
     --list-repos                            List all repos.
     --list-secrets                          List all secrets.
@@ -62,6 +66,7 @@ from docopt import docopt
 from nordstream.cicd.github import GitHub
 from nordstream.core.github import GitHubWorkflowRunner
 from nordstream.utils.log import logger, NordStreamLog
+from nordstream.git import Git
 
 
 def start(argv):
@@ -88,8 +93,16 @@ def start(argv):
         gitHub.branchName = args["--branch-name"]
         logger.info(f'Using branch: "{gitHub.branchName}"')
 
+    git = Git()
+    if args["--key-id"]:
+        git.keyId = args["--key-id"]
+        git.user = args["--user"]
+        git.email = args["--email"]
+
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])
+    gitHubWorkflowRunner.git = git
+
     if args["--no-repo"]:
         gitHubWorkflowRunner.extractRepo = not args["--no-repo"]
     if args["--no-env"]:
@@ -104,8 +117,8 @@ def start(argv):
         gitHubWorkflowRunner.writeAccessFilter = args["--write-filter"]
     if args["--force"]:
         gitHubWorkflowRunner.forceDeploy = args["--force"]
-    if args["--exploit-oidc"]:
-        gitHubWorkflowRunner.exploitOIDC = args["--exploit-oidc"]
+    if args["--aws-role"] or args["--azure-tenant-id"]:
+        gitHubWorkflowRunner.exploitOIDC = True
     if args["--azure-tenant-id"]:
         gitHubWorkflowRunner.tenantId = args["--azure-tenant-id"]
     if args["--azure-subscription-id"]:

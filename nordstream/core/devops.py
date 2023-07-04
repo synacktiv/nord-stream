@@ -20,6 +20,7 @@ class DevOpsRunner:
     _output = None
     _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
+    _git = None
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -88,6 +89,14 @@ class DevOpsRunner:
     @writeAccessFilter.setter
     def writeAccessFilter(self, value):
         self._writeAccessFilter = value
+
+    @property
+    def git(self):
+        return self._git
+
+    @git.setter
+    def git(self, value):
+        self._git = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/azure_devops"
@@ -237,7 +246,7 @@ class DevOpsRunner:
         logger.verbose(f"Launching pipeline.")
 
         pipelineGenerator.writeFile(f"./{self._pipelineFilename}")
-        pushOutput = gitPush(self._cicd.branchName)
+        pushOutput = self._git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -401,9 +410,9 @@ class DevOpsRunner:
         self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
     def __pushEmptyFile(self):
-        gitCreateEmptyFile(self._pipelineFilename)
+        self._git.gitCreateEmptyFile(self._pipelineFilename)
 
-        pushOutput = gitPush(self._cicd.branchName)
+        pushOutput = self._git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -431,10 +440,10 @@ class DevOpsRunner:
 
     def __deleteRemoteBranch(self):
         logger.info("Deleting remote branch")
-        gitCleanRemote(self._cicd.branchName)
+        self._git.gitCleanRemote(self._cicd.branchName)
 
         # logger.info('Trying to delete remote branch')
-        # deleteOutput = gitDeleteRemote(self._cicd.branchName)
+        # deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
         # deleteOutput.wait()
 
         # logger.debug(deleteOutput.returncode)
@@ -501,11 +510,11 @@ class DevOpsRunner:
                     logger.info(f'Getting remote repository: "{self._cicd.repoName}" /' f' "{repoId}"')
 
                 url = f"https://foo:{self._cicd.token}@dev.azure.com/{self._cicd.org}/{projectId}/_git/{self._cicd.repoName}"
-                gitClone(url)
+                self._git.gitClone(url)
 
                 chdir(self._cicd.repoName)
 
-                gitInitialization(self._cicd.branchName)
+                self._git.gitInitialization(self._cicd.branchName)
                 pipelineId = self.__createPipeline(projectId, repoId)
 
                 if self._yaml:

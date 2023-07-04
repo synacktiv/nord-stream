@@ -28,6 +28,8 @@ class GitHub:
         self._auth = ("foo", self._token)
         self._session = requests.Session()
         self._githubLogin = self.__getLogin()
+        if token.lower().startswith("ghs_"):
+            self._isGHSToken = True
 
     @staticmethod
     def checkToken(token):
@@ -36,7 +38,6 @@ class GitHub:
             logger.warning(
                 "You are using a GHS token this will break some part of this tool. Some research must be done with this particular type of token."
             )
-            self._isGHSToken = True
             return True
         return requests.get(f"https://api.github.com/user", auth=("foo", token)).status_code == 200
 
