@@ -543,7 +543,7 @@ class GitHubWorkflowRunner:
                     logger.raw(f"\t- timer: {wait} min\n", logging.INFO)
                 else:
                     branchPolicy = envDetails.get("deployment_branch_policy")
-                    if branchPolicy.get("custom_branch_policies"):
+                    if branchPolicy.get("custom_branch_policies", False):
                         logger.raw(f"\t- deployment branch policy: custom\n", logging.INFO)
                     else:
                         logger.raw(f"\t- deployment branch policy: protected\n", logging.INFO)
@@ -699,7 +699,7 @@ class GitHubWorkflowRunner:
 
             try:
                 logger.info("Modifying protections")
-                if branchPolicy:
+                if branchPolicy and branchPolicy.get("custom_branch_policies", False):
                     policyId = self._cicd.createDeploymentBranchPolicy(repo, env)
 
                 for protection in protectionRules:
