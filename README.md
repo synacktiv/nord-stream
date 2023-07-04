@@ -16,7 +16,7 @@ $ pip3 install -r requirements.txt
 
 More information in our article: https://www.synacktiv.com/publications/cicd-secrets-extraction-tips-and-tricks
 
-By default, the tool will attempt to extract all secrets from all accessible projects or repositories. Several options are available to restrict the extraction of secrets. The tool will also try to remove traces left after a pipeline deployment. To preserve traces, the `--no-clean` option can be used. Note that for GitLab some traces cannot be deleted.
+By default, the tool will attempt to extract all secrets from all accessible projects or repositories. Several options are available to restrict the extraction of secrets. The tool will also try to remove traces left after a pipeline deployment. To preserve traces, the `--no-clean` option can be used. Note that for GitLab, some traces cannot be deleted.
 
 ### Azure DevOps
 
@@ -178,7 +178,7 @@ Examples:
 
 ```
 
-As describe in the article, there is no way to remove the logs in the activity tab after a pipeline deployment. This must be taken into account during red-team engagements.
+As described in the article, there is no way to remove the logs in the activity tab after a pipeline deployment. This must be taken into account during Red Team engagements.
 
 ## TODO
 
