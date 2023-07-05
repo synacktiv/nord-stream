@@ -439,27 +439,28 @@ class DevOpsRunner:
         raise Exception("No repo found")
 
     def __deleteRemoteBranch(self):
-        logger.info("Deleting remote branch")
-        self._git.gitCleanRemote(self._cicd.branchName)
+        logger.verbose("Deleting remote branch")
+        deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
+        deleteOutput.wait()
 
-        # logger.info('Trying to delete remote branch')
-        # deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
-        # deleteOutput.wait()
-
-        # logger.debug(deleteOutput.returncode)
-        # if deleteOutput.returncode != 0:
-        #    logger.error(f"Error deleting remote branch {self._cicd.branchName}")
-        #    logger.raw(deleteOutput.communicate()[1], logging.INFO)
+        if deleteOutput.returncode != 0:
+            logger.error(f"Error deleting remote branch {self._cicd.branchName}")
+            logger.raw(deleteOutput.communicate()[1], logging.INFO)
+            return False
+        return True
 
     def __clean(self, projectId, repoId, deleteRemoteRepo):
         if self._cleanLogs:
             logger.info(f"Cleaning logs for project: {projectId}")
             self._cicd.cleanAllLogs(projectId)
+
         if deleteRemoteRepo:
             logger.info("Deleting remote repository")
             self._cicd.deleteGit(projectId, repoId)
         else:
-            self.__deleteRemoteBranch()
+            if not self.__deleteRemoteBranch():
+                # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
+                self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def __createPipeline(self, projectId, repoId):
         logger.info("Creating pipeline")
