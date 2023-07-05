@@ -5,10 +5,6 @@ from nordstream.utils.log import logger
 TODO: find an alternative to subprocess it's a bit crappy.
 """
 
-"""
-Return True if the command succeeds (returns 0), else return False.
-"""
-
 ATTACK_COMMIT_MSG = "Test deployment"
 CLEAN_COMMIT_MSG = "Remove test deployment"
 
