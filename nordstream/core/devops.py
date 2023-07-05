@@ -5,8 +5,10 @@ import time
 from os import makedirs, chdir
 from os.path import exists, realpath
 from nordstream.yaml.devops import DevOpsPipelineGenerator
-from nordstream.utils.errors import GitError, RepoCreationError
-from nordstream.git import *
+from nordstream.utils.errors import GitError, RepoCreationError, DevOpsError
+from nordstream.utils.log import logger
+from nordstream.git import Git
+import subprocess
 
 
 class DevOpsRunner:
@@ -21,7 +23,6 @@ class DevOpsRunner:
     _output = None
     _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
-    _git = None
     _pushedCommitsCount = 0
     _branchAlreadyExists = False
 
@@ -92,14 +93,6 @@ class DevOpsRunner:
     @writeAccessFilter.setter
     def writeAccessFilter(self, value):
         self._writeAccessFilter = value
-
-    @property
-    def git(self):
-        return self._git
-
-    @git.setter
-    def git(self, value):
-        self._git = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/azure_devops"
@@ -249,7 +242,7 @@ class DevOpsRunner:
         logger.verbose(f"Launching pipeline.")
 
         pipelineGenerator.writeFile(f"./{self._pipelineFilename}")
-        pushOutput = self._git.gitPush(self._cicd.branchName)
+        pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -266,8 +259,13 @@ class DevOpsRunner:
             else:
                 self._pushedCommitsCount += 1
                 logger.raw(pushOutput.communicate()[1])
-                # runId = self._cicd.runPipeline(project, pipelineId)
-                runId = self._cicd.getRunId(project, pipelineId)
+
+                # manual trigger because otherwise is difficult to get the right runId
+                run = self._cicd.runPipeline(project, pipelineId)
+
+                self.__checkRunErrors(run)
+
+                runId = run.get("id")
                 pipelineStatus = self._cicd.waitPipeline(project, pipelineId, runId)
 
                 if pipelineStatus == "succeeded":
@@ -279,7 +277,7 @@ class DevOpsRunner:
                     return None
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(e)
         finally:
             pass
 
@@ -366,7 +364,7 @@ class DevOpsRunner:
             if self._fileName:
                 self.__extractPipelineOutput(projectId, self._resType["github"])
 
-            logger.empty_line()
+        logger.empty_line()
 
     def __extractAzureRMSecrets(self, projectId, pipelineId, sc):
         if sc.get("data").get("scopeLevel").lower() == "subscription":
@@ -416,9 +414,9 @@ class DevOpsRunner:
             self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
     def __pushEmptyFile(self):
-        self._git.gitCreateEmptyFile("README.md")
+        Git.gitCreateEmptyFile("README.md")
 
-        pushOutput = self._git.gitPush(self._cicd.branchName)
+        pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -453,7 +451,7 @@ class DevOpsRunner:
 
     def __deleteRemoteBranch(self):
         logger.verbose("Deleting remote branch")
-        deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
+        deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)
         deleteOutput.wait()
 
         if deleteOutput.returncode != 0:
@@ -471,17 +469,18 @@ class DevOpsRunner:
                 self._cicd.deletePipeline(projectId)
 
         if deleteRemoteRepo:
-            logger.info("Deleting remote repository")
+            logger.verbose("Deleting remote repository")
             self._cicd.deleteGit(projectId, repoId)
 
         else:
             if self._pushedCommitsCount > 0:
+                logger.verbose("Cleaning commits.")
                 if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-                    self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+                    Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
                 else:
                     if not self.__deleteRemoteBranch():
                         # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
-                        self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
+                        Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def __createPipeline(self, projectId, repoId):
         logger.info("Getting pipeline")
@@ -531,13 +530,13 @@ class DevOpsRunner:
 
                 url = f"https://foo:{self._cicd.token}@dev.azure.com/{self._cicd.org}/{projectId}/_git/{self._cicd.repoName}"
 
-                if not self._git.gitClone(url):
+                if not Git.gitClone(url):
                     raise GitError("Fail to clone the repository")
 
                 chdir(self._cicd.repoName)
 
-                self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
-                self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+                self._branchAlreadyExists = Git.gitRemoteBranchExists(self._cicd.branchName)
+                Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
                 pipelineId, deleteRemotePipeline = self.__createPipeline(projectId, repoId)
 
@@ -549,6 +548,11 @@ class DevOpsRunner:
             except (GitError, RepoCreationError) as e:
                 name = project.get("name")
                 logger.error(f"Error in project {name}: {e}")
+
+            except KeyboardInterrupt:
+                self.__clean(projectId, repoId, deleteRemoteRepo, deleteRemotePipeline)
+                chdir("../")
+                subprocess.Popen(f"rm -rfd ./{self._cicd.repoName}", shell=True).wait()
 
             except Exception as e:
                 logger.error(f"Error during pipeline run: {e}")
@@ -575,3 +579,18 @@ class DevOpsRunner:
         id = response.get("authenticatedUser").get("id")
         if id != "":
             logger.raw(f"\t- Id: {id}\n", logging.INFO)
+
+    def __checkRunErrors(self, run):
+        if run.get("customProperties") != None:
+            validationResults = run.get("customProperties").get("ValidationResults", [])
+
+            msg = ""
+            for res in validationResults:
+                if res.get("result", "") == "error":
+
+                    if "Verify the name and credentials being used" in res.get("message", ""):
+                        raise DevOpsError("The stored token is not valid anymore.")
+
+                    msg += res.get("message", "") + "\n"
+
+            raise DevOpsError(msg)

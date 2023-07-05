@@ -16,12 +16,12 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                 "env": "#FIXME",
             }
         ],
-        "trigger": {"branches": {"include": ["*"]}},
+        "trigger": "none",
         "variables": [{"group": "#FIXME"}],
     }
     _secureFileTemplate = {
         "pool": {"vmImage": "ubuntu-latest"},
-        "trigger": {"branches": {"include": ["*"]}},
+        "trigger": "none",
         "steps": [
             {
                 "task": "DownloadSecureFile@1",
@@ -52,7 +52,7 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                 },
             }
         ],
-        "trigger": {"branches": {"include": ["*"]}},
+        "trigger": "none",
     }
     _serviceConnectionTemplateGitHub = {
         "pool": {"vmImage": "ubuntu-latest"},
@@ -77,7 +77,7 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                 },
             },
         ],
-        "trigger": {"branches": {"include": ["*"]}},
+        "trigger": "none",
     }
 
     def generatePipelineForSecretExtraction(self, variableGroup):

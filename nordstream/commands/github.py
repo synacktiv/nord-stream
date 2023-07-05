@@ -93,15 +93,13 @@ def start(argv):
         gitHub.branchName = args["--branch-name"]
         logger.info(f'Using branch: "{gitHub.branchName}"')
 
-    git = Git()
     if args["--key-id"]:
-        git.keyId = args["--key-id"]
-        git.user = args["--user"]
-        git.email = args["--email"]
+        git.KEY_ID = args["--key-id"]
+        git.USER = args["--user"]
+        git.EMAIL = args["--email"]
 
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])
-    gitHubWorkflowRunner.git = git
 
     if args["--no-repo"]:
         gitHubWorkflowRunner.extractRepo = not args["--no-repo"]

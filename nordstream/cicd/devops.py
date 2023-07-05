@@ -3,7 +3,7 @@ import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
-from nordstream.git import ATTACK_COMMIT_MSG
+from nordstream.git import Git
 
 
 class DevOps:
@@ -370,7 +370,31 @@ class DevOps:
             headers=self._header,
             verify=self._verifyCert,
         ).json()
-        return response.get("id")
+
+        return response
+
+    def __getBuilds(self, project):
+        logger.debug(f"Getting builds.")
+
+        return (
+            self._session.get(
+                f"{self._baseURL}/{project}/_apis/build/Builds",
+                auth=self._auth,
+                headers=self._header,
+                verify=self._verifyCert,
+            )
+            .json()
+            .get("value")
+        )
+
+    def __getBuildSources(self, project, buildId):
+
+        return self._session.get(
+            f"{self._baseURL}/{project}/_apis/build/Builds/{buildId}/sources",
+            auth=self._auth,
+            headers=self._header,
+            verify=self._verifyCert,
+        ).json()
 
     def getRunId(self, project, pipelineId):
         logger.debug(f"Getting RunId for pipeline: {pipelineId}")
@@ -378,24 +402,26 @@ class DevOps:
         found = False
 
         for i in range(self._maxRetry):
-            logger.warning(f"Run not available, sleeping for {self._sleepTime}s")
-            time.sleep(self._sleepTime)
 
-            response = self._session.get(
-                f"{self._baseURL}/{project}/_apis/build/Builds",
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
-            ).json()
+            # Don't wait first time
+            if i != 0:
+                logger.warning(f"Run not available, sleeping for {self._sleepTime}s")
+                time.sleep(self._sleepTime)
 
-            for build in response.get("value"):
-                if (
-                    build.get("definition").get("id") == pipelineId
-                    and build.get("triggerInfo").get("ci.message") == ATTACK_COMMIT_MSG
-                ):
-                    return build.get("id")
+            for build in self.__getBuilds(project):
 
-            if i == (self._maxRetry - 1):
+                if build.get("definition").get("id") == pipelineId:
+
+                    buildId = build.get("id")
+                    buildSource = self.__getBuildSources(project, buildId)
+
+                    if (
+                        buildSource.get("comment") == Git.ATTACK_COMMIT_MSG
+                        and buildSource.get("author").get("email") == Git.EMAIL
+                    ):
+                        return buildId
+
+            if i == (self._maxRetry):
                 logger.error("Error: run still not ready.")
 
         return None
@@ -403,33 +429,26 @@ class DevOps:
     def waitPipeline(self, project, pipelineId, runId):
         logger.info("Getting pipeline output")
 
-        time.sleep(5)
-        response = self._session.get(
-            f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}",
-            json={},
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        for i in range(self._maxRetry):
 
-        if response.get("state") != "completed":
-            for i in range(self._maxRetry):
+            if i != 0:
                 logger.warning(f"Pipeline still running, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
-                response = self._session.get(
-                    f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs",
-                    json={},
-                    auth=self._auth,
-                    headers=self._header,
-                    verify=self._verifyCert,
-                ).json()
 
-                if response.get("state") == "completed":
-                    return response.get("result")
-                if i == (self._maxRetry - 1):
-                    logger.error("Error: pipeline still not finished.")
+            response = self._session.get(
+                f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}",
+                json={},
+                auth=self._auth,
+                headers=self._header,
+                verify=self._verifyCert,
+            ).json()
 
-        return response.get("result")
+            if response.get("state") == "completed":
+                return response.get("result")
+            if i == (self._maxRetry - 1):
+                logger.error("Error: pipeline still not finished.")
+
+        return None
 
     def __createPipelineOutputDir(self, projectName):
         makedirs(f"{self._outputDir}/{self._org}/{projectName}", exist_ok=True)
@@ -437,70 +456,54 @@ class DevOps:
     def downloadPipelineOutput(self, projectId, runId):
         self.__createPipelineOutputDir(projectId)
 
-        buildTimeline = self._session.get(
-            f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
-            json={},
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        for i in range(self._maxRetry):
 
-        logs = [
-            record["log"]["id"]
-            for record in buildTimeline["records"]
-            if record["name"] == DevOpsPipelineGenerator.taskName
-        ]
-
-        if len(logs) == 0:
-            for i in range(self._maxRetry):
+            if i != 0:
                 logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
                 time.sleep(self._sleepTimeOutput)
-                buildTimeline = self._session.get(
-                    f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
-                    json={},
-                    auth=self._auth,
-                    headers=self._header,
-                    verify=self._verifyCert,
-                ).json()
 
-                logs = [
-                    record["log"]["id"]
-                    for record in buildTimeline["records"]
-                    if record["name"] == DevOpsPipelineGenerator.taskName
-                ]
-                if len(logs) != 0:
-                    break
-                if i == (self._maxRetry - 1):
-                    logger.error("Output still no ready, error !")
-                    return None
+            buildTimeline = self._session.get(
+                f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
+                json={},
+                auth=self._auth,
+                headers=self._header,
+                verify=self._verifyCert,
+            ).json()
+
+            logs = [
+                record["log"]["id"]
+                for record in buildTimeline["records"]
+                if record["name"] == DevOpsPipelineGenerator.taskName
+            ]
+            if len(logs) != 0:
+                break
+
+            if i == (self._maxRetry - 1):
+                logger.error("Output still no ready, error !")
+                return None
 
         logId = logs[0]
 
         logger.debug(f"Log ID of the extraction task: {logId}")
-        logOutput = self._session.get(
-            f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
-            json={},
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
 
-        if len(logOutput.get("value")) == 0:
-            for i in range(self._maxRetry):
+        for i in range(self._maxRetry):
+
+            if i != 0:
                 logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
                 time.sleep(self._sleepTimeOutput)
-                logOutput = self._session.get(
-                    f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
-                    json={},
-                    auth=self._auth,
-                    headers=self._header,
-                    verify=self._verifyCert,
-                ).json()
-                if len(logOutput.get("value")) != 0:
-                    break
-                if i == (self._maxRetry - 1):
-                    logger.error("Output still no ready, error !")
-                    return None
+
+            logOutput = self._session.get(
+                f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
+                json={},
+                auth=self._auth,
+                headers=self._header,
+                verify=self._verifyCert,
+            ).json()
+            if len(logOutput.get("value")) != 0:
+                break
+            if i == (self._maxRetry - 1):
+                logger.error("Output still no ready, error !")
+                return None
 
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
         with open(f"{self._outputDir}/{self._org}/{projectId}/pipeline_{date}.log", "w") as f:
@@ -512,27 +515,26 @@ class DevOps:
     def __cleanRunLogs(self, projectId):
         logger.verbose("Cleaning run logs.")
 
-        response = self._session.get(
-            f"{self._baseURL}/{projectId}/_apis/build/builds",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        builds = self.__getBuilds(projectId)
 
-        if response.get("count", 0) != 0:
-            for build in response.get("value"):
+        if len(builds) != 0:
+            for build in builds:
+
+                buildId = build.get("id")
+                buildSource = self.__getBuildSources(project, buildId)
+
                 if (
-                    build.get("triggerInfo").get("ci.message") == ATTACK_COMMIT_MSG
-                    and build.get("requestedFor").get("id") == self._devopsLoginId
+                    buildSource.get("comment") == Git.ATTACK_COMMIT_MSG
+                    and buildSource.get("author").get("email") == Git.EMAIL
                 ):
+                    return buildId
 
-                    buildId = build.get("id")
-                    self._session.delete(
-                        f"{self._baseURL}/{projectId}/_apis/build/builds/{buildId}",
-                        auth=self._auth,
-                        headers=self._header,
-                        verify=self._verifyCert,
-                    )
+                self._session.delete(
+                    f"{self._baseURL}/{projectId}/_apis/build/builds/{buildId}",
+                    auth=self._auth,
+                    headers=self._header,
+                    verify=self._verifyCert,
+                )
 
     def __cleanPipeline(self, projectId):
         logger.verbose(f"Removing pipeline.")

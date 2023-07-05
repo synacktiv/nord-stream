@@ -4,7 +4,7 @@ from os import makedirs
 import urllib.parse
 from nordstream.utils.errors import GitHubError
 from nordstream.utils.log import logger
-from nordstream.git import ATTACK_COMMIT_MSG
+from nordstream.git import Git
 
 
 class GitHub:
@@ -356,7 +356,7 @@ class GitHub:
             commit = self._session.get(
                 f"{self._repoURL}/{repo}/commits/{deployment['sha']}", auth=self._auth, headers=self._header
             ).json()
-            if commit["commit"]["message"] != ATTACK_COMMIT_MSG:
+            if commit["commit"]["message"] != Git.ATTACK_COMMIT_MSG:
                 continue
 
             deploymentId = deployment.get("id")

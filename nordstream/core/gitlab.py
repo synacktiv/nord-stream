@@ -3,7 +3,9 @@ import logging
 from urllib.parse import urlparse
 from os import makedirs, chdir
 from os.path import exists, realpath
-from nordstream.git import *
+from nordstream.utils.log import logger
+from nordstream.git import Git
+import subprocess
 from nordstream.utils.errors import GitLabError
 from nordstream.yaml.gitlab import GitLabPipelineGenerator
 
@@ -18,7 +20,6 @@ class GitLabRunner:
     _branchAlreadyExists = False
     _fileName = None
     _cleanLogs = True
-    _git = None
 
     @property
     def writeAccessFilter(self):
@@ -75,14 +76,6 @@ class GitLabRunner:
     @cleanLogs.setter
     def cleanLogs(self, value):
         self._cleanLogs = value
-
-    @property
-    def git(self):
-        return self._git
-
-    @git.setter
-    def git(self, value):
-        self._git = value
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -228,12 +221,12 @@ class GitLabRunner:
 
             domain = urlparse(self._cicd.url).netloc
             url = f"https://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
-            self._git.gitClone(url)
+            Git.gitClone(url)
 
             chdir(repoShortName)
             self._pushedCommitsCount = 0
-            self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
-            self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+            self._branchAlreadyExists = Git.gitRemoteBranchExists(self._cicd.branchName)
+            Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
                 # TODO: branch protections
@@ -244,6 +237,9 @@ class GitLabRunner:
                     self.__runCustomPipeline(project)
                 else:
                     logger.error("No yaml specify")
+
+            except KeyboardInterrupt:
+                pass
 
             except Exception as e:
                 logger.error(f"Error: {e}")
@@ -282,7 +278,7 @@ class GitLabRunner:
         projectId = project.get("id")
 
         pipelineGenerator.writeFile(f".gitlab-ci.yml")
-        pushOutput = self._git.gitPush(self._cicd.branchName)
+        pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
         try:
@@ -342,12 +338,13 @@ class GitLabRunner:
             self._cicd.cleanAllLogs(projectId)
 
         if self._pushedCommitsCount > 0:
+            logger.verbose("Cleaning commits.")
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
-                self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+                Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
                 if not self.__deleteRemoteBranch():
                     # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
-                    self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
+                    Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")
@@ -357,7 +354,7 @@ class GitLabRunner:
 
     def __deleteRemoteBranch(self):
         logger.verbose("Deleting remote branch")
-        deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
+        deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)
         deleteOutput.wait()
 
         if deleteOutput.returncode != 0:

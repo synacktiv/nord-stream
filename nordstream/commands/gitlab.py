@@ -74,13 +74,10 @@ def start(argv):
         gitlab.outputDir = args["--output-dir"] + "/"
     gitLabRunner = GitLabRunner(gitlab)
 
-    git = Git()
     if args["--key-id"]:
-        git.keyId = args["--key-id"]
-        git.user = args["--user"]
-        git.email = args["--email"]
-
-    gitLabRunner.git = git
+        git.KEY_ID = args["--key-id"]
+        git.USER = args["--user"]
+        git.EMAIL = args["--email"]
 
     if args["--branch-name"]:
         gitlab.branchName = args["--branch-name"]

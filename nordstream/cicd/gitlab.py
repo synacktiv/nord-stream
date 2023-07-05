@@ -3,7 +3,7 @@ import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
-from nordstream.git import ATTACK_COMMIT_MSG, LOCAL_USERNAME
+from nordstream.git import Git
 
 COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 
@@ -371,11 +371,11 @@ class GitLab:
                     verify=self._verifyCert,
                 ).json()
 
-                if response.get("title") != ATTACK_COMMIT_MSG:
+                if response.get("title") != Git.ATTACK_COMMIT_MSG:
                     continue
 
-                # if response.get("author_name") != LOCAL_USERNAME:
-                #    continue
+                if response.get("author_name") != Git.LOCAL_USERNAME:
+                    continue
 
             pipelineId = pipeline.get("id")
             response = self._session.delete(
