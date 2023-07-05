@@ -374,8 +374,8 @@ class GitLab:
                 if response.get("title") != ATTACK_COMMIT_MSG:
                     continue
 
-                if response.get("author_name") != LOCAL_USERNAME:
-                    continue
+                # if response.get("author_name") != LOCAL_USERNAME:
+                #    continue
 
             pipelineId = pipeline.get("id")
             response = self._session.delete(

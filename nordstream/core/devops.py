@@ -5,6 +5,7 @@ import time
 from os import makedirs, chdir
 from os.path import exists, realpath
 from nordstream.yaml.devops import DevOpsPipelineGenerator
+from nordstream.utils.errors import GitError, RepoCreationError
 from nordstream.git import *
 
 
@@ -16,11 +17,13 @@ class DevOpsRunner:
     _extractGitHubServiceconnections = True
     _yaml = None
     _writeAccessFilter = False
-    _pipelineFilename = "azure-pipeline.yaml"
+    _pipelineFilename = "azure-pipelines.yml"
     _output = None
     _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
     _git = None
+    _pushedCommitsCount = 0
+    _branchAlreadyExists = False
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -261,9 +264,11 @@ class DevOpsRunner:
                 logger.raw(pushOutput.communicate()[1], logging.INFO)
 
             else:
+                self._pushedCommitsCount += 1
                 logger.raw(pushOutput.communicate()[1])
-                runId = self._cicd.runPipeline(project, pipelineId)
-                pipelineStatus = self._cicd.waitPipeline(project, pipelineId)
+                # runId = self._cicd.runPipeline(project, pipelineId)
+                runId = self._cicd.getRunId(project, pipelineId)
+                pipelineStatus = self._cicd.waitPipeline(project, pipelineId, runId)
 
                 if pipelineStatus == "succeeded":
                     logger.success("Pipeline has successfully terminated.")
@@ -388,9 +393,9 @@ class DevOpsRunner:
                 continue
 
             scType = sc.get("type").lower()
-            if scType == "azurerm" and self._extractAzureServiceconnections:
+            if scType == "azurerm":
                 self.__extractAzureRMSecrets(projectId, pipelineId, sc)
-            elif scType == "github" and self._extractGitHubServiceconnections:
+            elif scType == "github":
                 self.__extractGitHubSecrets(projectId, pipelineId, sc)
 
     def manualCleanLogs(self):
@@ -407,10 +412,11 @@ class DevOpsRunner:
         if self._extractSecureFiles:
             self.__extractSecureFiles(projectId, pipelineId)
 
-        self.__extractServiceConnectionsSecrets(projectId, pipelineId)
+        if self._extractAzureServiceconnections or self._extractGitHubServiceconnections:
+            self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
     def __pushEmptyFile(self):
-        self._git.gitCreateEmptyFile(self._pipelineFilename)
+        self._git.gitCreateEmptyFile("README.md")
 
         pushOutput = self._git.gitPush(self._cicd.branchName)
         pushOutput.wait()
@@ -426,17 +432,24 @@ class DevOpsRunner:
             logger.exception(e)
 
     def __createRemoteRepo(self, projectId):
-        repoId = self._cicd.createGit(projectId)
-        if repoId:
+        repo = self._cicd.createGit(projectId)
+        if repo.get("id"):
+            repoId = repo.get("id")
             logger.info(f'New remote repository created: "{self._cicd.repoName}" / "{repoId}"')
-            return repoId
+            return repo
         else:
             return None
 
     def __getRemoteRepo(self, projectId):
         for repo in self._cicd.listRepositories(projectId):
-            return repo
-        raise Exception("No repo found")
+            if self._cicd.repoName == repo.get("name"):
+                return repo, False
+
+        repo = self.__createRemoteRepo(projectId)
+        if repo != None:
+            return repo, True
+
+        raise RepoCreationError("No repo found")
 
     def __deleteRemoteBranch(self):
         logger.verbose("Deleting remote branch")
@@ -449,30 +462,39 @@ class DevOpsRunner:
             return False
         return True
 
-    def __clean(self, projectId, repoId, deleteRemoteRepo):
+    def __clean(self, projectId, repoId, deleteRemoteRepo, deleteRemotePipeline):
         if self._cleanLogs:
             logger.info(f"Cleaning logs for project: {projectId}")
             self._cicd.cleanAllLogs(projectId)
 
+            if deleteRemotePipeline:
+                self._cicd.deletePipeline(projectId)
+
         if deleteRemoteRepo:
             logger.info("Deleting remote repository")
             self._cicd.deleteGit(projectId, repoId)
+
         else:
-            if not self.__deleteRemoteBranch():
-                # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
-                self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
+            if self._pushedCommitsCount > 0:
+                if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
+                    self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
+                else:
+                    if not self.__deleteRemoteBranch():
+                        # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
+                        self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def __createPipeline(self, projectId, repoId):
-        logger.info("Creating pipeline")
+        logger.info("Getting pipeline")
         self.__pushEmptyFile()
+
+        for pipeline in self._cicd.listPipelines(projectId):
+            if pipeline.get("name") == self._cicd.pipelineName:
+                return pipeline.get("id"), False
 
         pipelineId = self._cicd.createPipeline(projectId, repoId, f"{self._pipelineFilename}")
         if pipelineId:
-            return pipelineId
+            return pipelineId, True
         else:
-            for pipeline in self._cicd.listPipelines(projectId):
-                if pipeline.get("name") == self._cicd.pipelineName:
-                    return pipeline.get("id")
             raise Exception("unable to create a pipeline")
 
     def __runCustomPipeline(self, projectId, pipelineId):
@@ -493,6 +515,7 @@ class DevOpsRunner:
             projectId = project.get("id")
             repoId = None
             deleteRemoteRepo = False
+            deleteRemotePipeline = False
 
             # skip if no secrets
             if not self._yaml:
@@ -501,35 +524,43 @@ class DevOpsRunner:
 
             try:
                 # Create or get first repo of the project
-                repoId = self.__createRemoteRepo(projectId)
-                if repoId:
-                    deleteRemoteRepo = True
-                else:
-                    repo = self.__getRemoteRepo(projectId)
-                    repoId = repo.get("id")
-                    self._cicd.repoName = repo.get("name")
-                    logger.info(f'Getting remote repository: "{self._cicd.repoName}" /' f' "{repoId}"')
+                repo, deleteRemoteRepo = self.__getRemoteRepo(projectId)
+                repoId = repo.get("id")
+                self._cicd.repoName = repo.get("name")
+                logger.info(f'Getting remote repository: "{self._cicd.repoName}" /' f' "{repoId}"')
 
                 url = f"https://foo:{self._cicd.token}@dev.azure.com/{self._cicd.org}/{projectId}/_git/{self._cicd.repoName}"
-                self._git.gitClone(url)
+
+                if not self._git.gitClone(url):
+                    raise GitError("Fail to clone the repository")
 
                 chdir(self._cicd.repoName)
 
-                self._git.gitInitialization(self._cicd.branchName)
-                pipelineId = self.__createPipeline(projectId, repoId)
+                self._branchAlreadyExists = self._git.gitRemoteBranchExists(self._cicd.branchName)
+                self._git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+
+                pipelineId, deleteRemotePipeline = self.__createPipeline(projectId, repoId)
 
                 if self._yaml:
                     self.__runCustomPipeline(projectId, pipelineId)
                 else:
                     self.__runSecretsExtractionPipeline(projectId, pipelineId)
 
+            except (GitError, RepoCreationError) as e:
+                name = project.get("name")
+                logger.error(f"Error in project {name}: {e}")
+
             except Exception as e:
                 logger.error(f"Error during pipeline run: {e}")
                 if logger.getEffectiveLevel() == logging.DEBUG:
                     logger.exception(e)
 
-            finally:
-                self.__clean(projectId, repoId, deleteRemoteRepo)
+                self.__clean(projectId, repoId, deleteRemoteRepo, deleteRemotePipeline)
+                chdir("../")
+                subprocess.Popen(f"rm -rfd ./{self._cicd.repoName}", shell=True).wait()
+
+            else:
+                self.__clean(projectId, repoId, deleteRemoteRepo, deleteRemotePipeline)
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{self._cicd.repoName}", shell=True).wait()
 

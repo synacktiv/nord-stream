@@ -9,8 +9,8 @@ TODO: find an alternative to subprocess it's a bit crappy.
 Return True if the command succeeds (returns 0), else return False.
 """
 
-ATTACK_COMMIT_MSG = "Deployment"
-CLEAN_COMMIT_MSG = "Remove deployment"
+ATTACK_COMMIT_MSG = "Test deployment"
+CLEAN_COMMIT_MSG = "Remove test deployment"
 
 
 class Git:
@@ -142,7 +142,7 @@ class Git:
         self.gitRunCommand(f"mkdir -p {directory}")
 
     def gitClone(self, url):
-        self.gitRunCommand(f"git clone {url}")
+        return self.gitRunCommand(f"git clone {url}")
 
     def gitGetCurrentBranch(self):
         return (

@@ -3,9 +3,12 @@ import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
+from nordstream.git import ATTACK_COMMIT_MSG
 
 
 class DevOps:
+    _DEFAULT_PIPELINE_NAME = "Build_pipeline_58675"
+    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu"
     _token = None
     _auth = None
     _org = None
@@ -16,8 +19,8 @@ class DevOps:
     _session = None
     _repoName = "TestDev_ea5Eu"
     _outputDir = "nord-stream-logs"
-    _pipelineName = "Build_pipeline_58675"
-    _branchName = "dev_remote_ea5Eu"
+    _pipelineName = _DEFAULT_PIPELINE_NAME
+    _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
     _sleepTimeOutput = 6
     _maxRetry = 10
@@ -43,6 +46,10 @@ class DevOps:
     def branchName(self):
         return self._branchName
 
+    @branchName.setter
+    def branchName(self, value):
+        self._branchName = value
+
     @property
     def repoName(self):
         return self._repoName
@@ -55,6 +62,10 @@ class DevOps:
     def pipelineName(self):
         return self._pipelineName
 
+    @pipelineName.setter
+    def pipelineName(self, value):
+        self._pipelineName = value
+
     @property
     def token(self):
         return self._token
@@ -66,6 +77,14 @@ class DevOps:
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
+
+    @property
+    def defaultPipelineName(self):
+        return self._DEFAULT_PIPELINE_NAME
+
+    @property
+    def defaultBranchName(self):
+        return self._DEFAULT_BRANCH_NAME
 
     def __getLogin(self):
         return self.getUser().get("authenticatedUser").get("id")
@@ -272,9 +291,11 @@ class DevOps:
         if allPipelines and allPipelines.get("authorized"):
             return True
 
-        logger.debug(
-            f"\"{resource['name']}\" has restricted permissions. Adding access permissions for the custom pipeline"
-        )
+        for pipeline in response.get("pipelines"):
+            if pipeline.get("id") == pipelineId:
+                return True
+
+        logger.debug(f"\"{resource['name']}\" has restricted permissions. Adding access permissions for the pipeline")
         response = self._session.patch(
             f"{self._baseURL}/{projectId}/_apis/pipelines/pipelinePermissions/{resourceType}/{resourceId}",
             auth=self._auth,
@@ -299,7 +320,7 @@ class DevOps:
             verify=self._verifyCert,
         ).json()
 
-        return response.get("id")
+        return response
 
     def deleteGit(self, project, repoId):
         logger.debug(f"Deleting git repo for: {project}")
@@ -351,19 +372,47 @@ class DevOps:
         ).json()
         return response.get("id")
 
-    def waitPipeline(self, project, pipelineId):
+    def getRunId(self, project, pipelineId):
+        logger.debug(f"Getting RunId for pipeline: {pipelineId}")
+
+        found = False
+
+        for i in range(self._maxRetry):
+            logger.warning(f"Run not available, sleeping for {self._sleepTime}s")
+            time.sleep(self._sleepTime)
+
+            response = self._session.get(
+                f"{self._baseURL}/{project}/_apis/build/Builds",
+                auth=self._auth,
+                headers=self._header,
+                verify=self._verifyCert,
+            ).json()
+
+            for build in response.get("value"):
+                if (
+                    build.get("definition").get("id") == pipelineId
+                    and build.get("triggerInfo").get("ci.message") == ATTACK_COMMIT_MSG
+                ):
+                    return build.get("id")
+
+            if i == (self._maxRetry - 1):
+                logger.error("Error: run still not ready.")
+
+        return None
+
+    def waitPipeline(self, project, pipelineId, runId):
         logger.info("Getting pipeline output")
 
         time.sleep(5)
         response = self._session.get(
-            f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs",
+            f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}",
             json={},
             auth=self._auth,
             headers=self._header,
             verify=self._verifyCert,
         ).json()
 
-        if response.get("value")[0].get("state") != "completed":
+        if response.get("state") != "completed":
             for i in range(self._maxRetry):
                 logger.warning(f"Pipeline still running, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
@@ -374,12 +423,13 @@ class DevOps:
                     headers=self._header,
                     verify=self._verifyCert,
                 ).json()
-                if response.get("value")[0].get("state") == "completed":
-                    break
+
+                if response.get("state") == "completed":
+                    return response.get("result")
                 if i == (self._maxRetry - 1):
                     logger.error("Error: pipeline still not finished.")
 
-        return response.get("value")[0].get("result")
+        return response.get("result")
 
     def __createPipelineOutputDir(self, projectName):
         makedirs(f"{self._outputDir}/{self._org}/{projectName}", exist_ok=True)
@@ -471,7 +521,11 @@ class DevOps:
 
         if response.get("count", 0) != 0:
             for build in response.get("value"):
-                if build.get("repository").get("name") == self._repoName:
+                if (
+                    build.get("triggerInfo").get("ci.message") == ATTACK_COMMIT_MSG
+                    and build.get("requestedFor").get("id") == self._devopsLoginId
+                ):
+
                     buildId = build.get("id")
                     self._session.delete(
                         f"{self._baseURL}/{projectId}/_apis/build/builds/{buildId}",
@@ -500,7 +554,7 @@ class DevOps:
                         verify=self._verifyCert,
                     )
 
-    def __deletePipeline(self, projectId):
+    def deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/build/Definitions",
@@ -522,8 +576,7 @@ class DevOps:
                     )
 
     def cleanAllLogs(self, projectId):
-        # deleting the pipeline removes everything
-        self.__deletePipeline(projectId)
+        self.__cleanRunLogs(projectId)
 
     def listServiceConnections(self, projectId):
         logger.debug("Listing service connections")

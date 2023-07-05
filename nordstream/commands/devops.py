@@ -2,8 +2,8 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
@@ -39,6 +39,9 @@ args
     --build-yaml <output>                   Create a pipeline yaml file with default configuration.
     --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github
     --describe-token                        Display information on the token
+    --branch-name <name>                    Use specific branch name for deployment.
+    --pipeline-name <name>                  Use pipeline for deployment.
+    --repo-name <name>                      Use specific repo for deployment.
 
 Examples:
     List all secrets from all projects
@@ -75,6 +78,13 @@ def start(argv):
     devops = DevOps(args["--token"], args["--org"])
     if args["--output-dir"]:
         devops.outputDir = args["--output-dir"] + "/"
+    if args["--branch-name"]:
+        devops.branchName = args["--branch-name"]
+    if args["--pipeline-name"]:
+        devops.pipelineName = args["--pipeline-name"]
+    if args["--repo-name"]:
+        devops.repoName = args["--repo-name"]
+
     devopsRunner = DevOpsRunner(devops)
 
     git = Git()
@@ -101,13 +111,14 @@ def start(argv):
     if args["--no-clean"]:
         devopsRunner.cleanLogs = not args["--no-clean"]
 
+    if args["--describe-token"]:
+        devopsRunner.describeToken()
+        return
+
     devopsRunner.getProjects(args["--project"])
 
     # logic
-    if args["--describe-token"]:
-        devopsRunner.describeToken()
-
-    elif args["--list-projects"]:
+    if args["--list-projects"]:
         devopsRunner.listDevOpsProjects()
 
     elif args["--list-secrets"]:
