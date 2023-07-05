@@ -345,7 +345,9 @@ class GitLabRunner:
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                 self._git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
-                self.__deleteRemoteBranch()
+                if not self.__deleteRemoteBranch():
+                    # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
+                    self._git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")
@@ -354,8 +356,15 @@ class GitLabRunner:
             self._cicd.cleanAllLogs(project.get("id"))
 
     def __deleteRemoteBranch(self):
-        logger.info("Deleting remote branch")
-        self._git.gitCleanRemote(self._cicd.branchName)
+        logger.verbose("Deleting remote branch")
+        deleteOutput = self._git.gitDeleteRemote(self._cicd.branchName)
+        deleteOutput.wait()
+
+        if deleteOutput.returncode != 0:
+            logger.error(f"Error deleting remote branch {self._cicd.branchName}")
+            logger.raw(deleteOutput.communicate()[1], logging.INFO)
+            return False
+        return True
 
     def describeToken(self):
         response = self._cicd.getUser()

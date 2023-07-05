@@ -9,8 +9,8 @@ TODO: find an alternative to subprocess it's a bit crappy.
 Return True if the command succeeds (returns 0), else return False.
 """
 
-ATTACK_COMMIT_MSG = "Test deployment"
-CLEAN_COMMIT_MSG = "Remove test deployment"
+ATTACK_COMMIT_MSG = "Deployment"
+CLEAN_COMMIT_MSG = "Remove deployment"
 
 
 class Git:
@@ -73,12 +73,21 @@ class Git:
         self.gitRunCommand(f"git pull origin {branch}")
         self.gitRunCommand("git rm . -rf")
 
-    def gitCleanRemote(self, branch):
+    def gitCleanRemote(self, branch, leaveOneFile=False):
         logger.verbose("Cleaning remote branch")
         self.gitRunCommand("git rm . -rf")
         self.gitRunCommand("git rm .github/ -rf")
+
+        if leaveOneFile:
+            self.gitRunCommand(f"touch test_dev.txt")
+            self.gitRunCommand(f"git add -A")
+
         self.gitRunCommand(f"git commit -m '{CLEAN_COMMIT_MSG}'")
-        self.gitRunCommand(f"git push -d origin {branch}")
+
+        if leaveOneFile:
+            self.gitRunCommand(f"git push origin {branch}")
+        else:
+            self.gitRunCommand(f"git push -d origin {branch}")
 
     def gitRemoteBranchExists(self, branch):
         logger.verbose("Checking if remote branch exists")
