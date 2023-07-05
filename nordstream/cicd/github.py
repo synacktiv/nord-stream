@@ -8,7 +8,7 @@ from nordstream.git import Git
 
 
 class GitHub:
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu"
+    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test/v1"
     _token = None
     _auth = None
     _org = None

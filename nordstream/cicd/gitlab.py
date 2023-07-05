@@ -9,7 +9,7 @@ COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 
 
 class GitLab:
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu"
+    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test"
     _auth = None
     _session = None
     _token = None
