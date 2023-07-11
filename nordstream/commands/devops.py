@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --no-aws --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
     nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
@@ -33,6 +33,7 @@ args
     --no-sf                                 Don't extract secure files
     --no-gh                                 Don't extract GitHub service connection secrets
     --no-az                                 Don't extract Azure service connection secrets
+    --no-aws                                Don't extract AWS service connection secrets
     --list-projects                         List all projects.
     --list-secrets                          List all secrets.
     --write-filter                          Filter projects where current user has write or admin access.
@@ -105,6 +106,8 @@ def start(argv):
         devopsRunner.extractAzureServiceconnections = not args["--no-az"]
     if args["--no-gh"]:
         devopsRunner.extractGitHubServiceconnections = not args["--no-gh"]
+    if ars["--no-aws"]:
+        devopsRunner.extractAWSServiceconnections = not args["--no-aws"]
     if args["--no-clean"]:
         devopsRunner.cleanLogs = not args["--no-clean"]
 

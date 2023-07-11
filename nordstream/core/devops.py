@@ -17,6 +17,7 @@ class DevOpsRunner:
     _extractSecureFiles = True
     _extractAzureServiceconnections = True
     _extractGitHubServiceconnections = True
+    _extractAWSServiceconnections = True
     _yaml = None
     _writeAccessFilter = False
     _pipelineFilename = "azure-pipelines.yml"
@@ -62,6 +63,14 @@ class DevOpsRunner:
     @extractGitHubServiceconnections.setter
     def extractGitHubServiceconnections(self, value):
         self._extractGitHubServiceconnections = value
+
+    @property
+    def extractAWSServiceconnections(self):
+        return self._extractAWSServiceconnections
+
+    @extractAWSServiceconnections.setter
+    def extractAWSServiceconnections(self, value):
+        self._extractAWSServiceconnections = value
 
     @property
     def output(self):
@@ -177,7 +186,11 @@ class DevOpsRunner:
         projectId = project.get("id")
         projectName = project.get("name")
 
-        if self._extractAzureServiceconnections or self._extractGitHubServiceconnections:
+        if (
+            self._extractAzureServiceconnections
+            or self._extractGitHubServiceconnections
+            or self._extractAWSServiceconnections
+        ):
 
             try:
                 return len(self._cicd.listServiceConnections(projectId)) != 0
@@ -469,7 +482,7 @@ class DevOpsRunner:
                         self.__extractAzureRMSecrets(projectId, pipelineId, sc)
                     elif self._extractGitHubServiceconnections and scType == "github":
                         self.__extractGitHubSecrets(projectId, pipelineId, sc)
-                    elif scType == "aws":
+                    elif self._extractAWSServiceconnections and scType == "aws":
                         self.__extractAWSSecrets(projectId, pipelineId, sc)
 
     def manualCleanLogs(self):
@@ -486,7 +499,11 @@ class DevOpsRunner:
         if self._extractSecureFiles:
             self.__extractSecureFiles(projectId, pipelineId)
 
-        if self._extractAzureServiceconnections or self._extractGitHubServiceconnections:
+        if (
+            self._extractAzureServiceconnections
+            or self._extractGitHubServiceconnections
+            or self._extractAWSServiceconnections
+        ):
             self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
     def __pushEmptyFile(self):
