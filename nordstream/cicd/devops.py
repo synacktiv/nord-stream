@@ -4,6 +4,7 @@ from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.git import Git
+from nordstream.utils.errors import DevOpsError
 
 
 class DevOps:
@@ -22,7 +23,6 @@ class DevOps:
     _pipelineName = _DEFAULT_PIPELINE_NAME
     _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
-    _sleepTimeOutput = 6
     _maxRetry = 10
     _verifyCert = True
 
@@ -248,7 +248,13 @@ class DevOps:
             auth=self._auth,
             headers=self._header,
             verify=self._verifyCert,
-        ).json()
+        )
+
+        if response.status_code != 200:
+            raise DevOpsError("Can't list variable groups secrets.")
+
+        response = response.json()
+
         res = []
 
         if response.get("count", 0) != 0:
@@ -268,7 +274,13 @@ class DevOps:
             auth=self._auth,
             headers=self._header,
             verify=self._verifyCert,
-        ).json()
+        )
+
+        if response.status_code != 200:
+            raise DevOpsError("Can't list secure files.")
+
+        response = response.json()
+
         res = []
 
         if response["count"]:
@@ -459,8 +471,8 @@ class DevOps:
         for i in range(self._maxRetry):
 
             if i != 0:
-                logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
-                time.sleep(self._sleepTimeOutput)
+                logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
+                time.sleep(self._sleepTime)
 
             buildTimeline = self._session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
@@ -489,8 +501,8 @@ class DevOps:
         for i in range(self._maxRetry):
 
             if i != 0:
-                logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
-                time.sleep(self._sleepTimeOutput)
+                logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
+                time.sleep(self._sleepTime)
 
             logOutput = self._session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
@@ -521,7 +533,7 @@ class DevOps:
             for build in builds:
 
                 buildId = build.get("id")
-                buildSource = self.__getBuildSources(project, buildId)
+                buildSource = self.__getBuildSources(projectId, buildId)
 
                 if (
                     buildSource.get("comment") == Git.ATTACK_COMMIT_MSG
@@ -589,7 +601,12 @@ class DevOps:
             auth=self._auth,
             headers=self._header,
             verify=self._verifyCert,
-        ).json()
+        )
+
+        if response.status_code != 200:
+            raise DevOpsError("Can't list service connections.")
+
+        response = response.json()
 
         if response.get("count", 0) != 0:
             res = response.get("value")

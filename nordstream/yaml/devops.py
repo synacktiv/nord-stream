@@ -80,6 +80,26 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         "trigger": "none",
     }
 
+    _serviceConnectionTemplateAWS = {
+        "pool": {"vmImage": "ubuntu-latest"},
+        "steps": [
+            {
+                "task": "AWSShellScript@1",
+                "displayName": taskName,
+                "inputs": {
+                    # "regionName": "#FIXME",
+                    "awsCredentials": "#FIXME",
+                    "scriptType": "inline",
+                    "inlineScript": (
+                        'sh -c "env | grep -E \\"(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\\" | base64 -w0 |'
+                        ' base64 -w0; echo  ;"'
+                    ),
+                },
+            }
+        ],
+        "trigger": "none",
+    }
+
     def generatePipelineForSecretExtraction(self, variableGroup):
         self.addVariableGroupToYaml(variableGroup.get("name"))
         self.addSecretsToYaml(variableGroup.get("variables"))
@@ -95,6 +115,11 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
     def generatePipelineForGitHub(self, endpoint):
         self._defaultTemplate = self._serviceConnectionTemplateGitHub
         self.__setGitHubEndpoint(endpoint)
+
+    def generatePipelineForAWS(self, awsCredentials):
+        self._defaultTemplate = self._serviceConnectionTemplateAWS
+        # self.__setAWSRegion(regionName)
+        self.__setAWSCredential(awsCredentials)
 
     def addVariableGroupToYaml(self, variableGroupName):
         self._defaultTemplate.get("variables")[0]["group"] = variableGroupName
@@ -114,3 +139,9 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
 
     def __setGitHubEndpoint(self, endpoint):
         self._defaultTemplate.get("resources").get("repositories")[0]["endpoint"] = endpoint
+
+    def __setAWSRegion(self, regionName):
+        self._defaultTemplate.get("steps")[0].get("inputs")["regionName"] = regionName
+
+    def __setAWSCredential(self, awsCredentials):
+        self._defaultTemplate.get("steps")[0].get("inputs")["awsCredentials"] = awsCredentials

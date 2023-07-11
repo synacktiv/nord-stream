@@ -126,9 +126,22 @@ class Git:
     def gitCreateDir(cls, directory):
         cls.gitRunCommand(f"mkdir -p {directory}")
 
-    @classmethod
-    def gitClone(cls, url):
-        return cls.gitRunCommand(f"git clone {url}")
+    @staticmethod
+    def gitClone(url):
+        res = subprocess.Popen(
+            f"git clone {url}",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        res.wait()
+
+        if res.returncode == 0:
+            return True
+        elif b"You appear to have cloned an empty repository" in res.communicate()[1].strip():
+            return True
+        else:
+            return False
 
     @staticmethod
     def gitGetCurrentBranch():

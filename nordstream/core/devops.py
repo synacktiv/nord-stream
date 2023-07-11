@@ -25,6 +25,7 @@ class DevOpsRunner:
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
     _pushedCommitsCount = 0
     _branchAlreadyExists = False
+    _allowedTypes = ["azurerm", "github", "aws"]
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -134,41 +135,69 @@ class DevOpsRunner:
             logger.empty_line()
 
     def __displayProjectVariableGroupsSecrets(self, project):
-        secrets = self._cicd.listProjectVariableGroupsSecrets(project)
-        if len(secrets) != 0:
-            for variableGroup in secrets:
-                logger.info(f"Variable group: \"{variableGroup.get('name')}\"")
-                for sec in variableGroup.get("variables"):
-                    logger.raw(f"\t- {sec}\n", logging.INFO)
+
+        try:
+            secrets = self._cicd.listProjectVariableGroupsSecrets(project)
+        except DevOpsError as e:
+            logger.error(e)
+
+        else:
+            if len(secrets) != 0:
+                for variableGroup in secrets:
+                    logger.info(f"Variable group: \"{variableGroup.get('name')}\"")
+                    for sec in variableGroup.get("variables"):
+                        logger.raw(f"\t- {sec}\n", logging.INFO)
 
     def __displayProjectSecureFiles(self, project):
-        secureFiles = self._cicd.listProjectSecureFiles(project)
-        if secureFiles:
-            for sf in secureFiles:
-                logger.info(f'Secure file: "{sf["name"]}"')
+
+        try:
+            secureFiles = self._cicd.listProjectSecureFiles(project)
+        except DevOpsError as e:
+            logger.error(e)
+        else:
+            if secureFiles:
+                for sf in secureFiles:
+                    logger.info(f'Secure file: "{sf["name"]}"')
 
     def __displayServiceConnections(self, projectId):
-        serviceConnections = self._cicd.listServiceConnections(projectId)
 
-        if len(serviceConnections) != 0:
-            logger.info("Service connections:")
-            for sc in serviceConnections:
-                scType = sc.get("type")
-                scName = sc.get("name")
-                logger.raw(f"\t- {scName} ({scType})\n", logging.INFO)
+        try:
+            serviceConnections = self._cicd.listServiceConnections(projectId)
+        except DevOpsError as e:
+            logger.error(e)
+        else:
+            if len(serviceConnections) != 0:
+                logger.info("Service connections:")
+                for sc in serviceConnections:
+                    scType = sc.get("type")
+                    scName = sc.get("name")
+                    logger.raw(f"\t- {scName} ({scType})\n", logging.INFO)
 
     def __checkSecrets(self, project):
         projectId = project.get("id")
         projectName = project.get("name")
 
-        if (self._extractAzureServiceconnections or self._extractGitHubServiceconnections) and len(
-            self._cicd.listServiceConnections(projectId)
-        ) != 0:
-            return True
-        elif self._extractVariableGroups and len(self._cicd.listProjectVariableGroupsSecrets(projectId)) != 0:
-            return True
-        elif self._extractSecureFiles and len(self._cicd.listProjectSecureFiles(projectId)) != 0:
-            return True
+        if self._extractAzureServiceconnections or self._extractGitHubServiceconnections:
+
+            try:
+                return len(self._cicd.listServiceConnections(projectId)) != 0
+            except DevOpsError as e:
+                return False
+
+        elif self._extractVariableGroups:
+
+            try:
+                return len(self._cicd.listProjectVariableGroupsSecrets(projectId)) != 0
+            except DevOpsError as e:
+                return False
+
+        elif self._extractSecureFiles:
+
+            try:
+                return len(self._cicd.listProjectSecureFiles(projectId)) != 0
+            except DevOpsError as e:
+                return False
+
         else:
             logger.info(f'No secrets found for project "{projectName}" / "{projectId}"')
             return False
@@ -289,67 +318,79 @@ class DevOpsRunner:
     def __extractVariableGroupsSecrets(self, projectId, pipelineId):
         logger.verbose(f"Getting variable groups secrets")
 
-        variableGroups = self._cicd.listProjectVariableGroupsSecrets(projectId)
-
-        if len(variableGroups) > 0:
-            for variableGroup in variableGroups:
-                pipelineGenerator = DevOpsPipelineGenerator()
-                pipelineGenerator.generatePipelineForSecretExtraction(variableGroup)
-
-                logger.verbose(
-                    f'Checking (and modifying) pipeline permissions for variable group: "{variableGroup["name"]}"'
-                )
-                if not self._cicd.authorizePipelineForResourceAccess(
-                    projectId, pipelineId, variableGroup, "variablegroup"
-                ):
-                    continue
-
-                variableGroupName = variableGroup.get("name")
-
-                logger.info(f'Extracting secrets for variable group: "{variableGroupName}"')
-                runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
-                if runId:
-                    self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
-                    if self._fileName:
-                        self.__extractPipelineOutput(projectId, self._resType["doubleb64"])
-
-                    logger.empty_line()
+        try:
+            variableGroups = self._cicd.listProjectVariableGroupsSecrets(projectId)
+        except DevOpsError as e:
+            logger.error(e)
 
         else:
-            logger.info("No variable groups found")
+            if len(variableGroups) > 0:
+                for variableGroup in variableGroups:
+                    pipelineGenerator = DevOpsPipelineGenerator()
+                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup)
+
+                    logger.verbose(
+                        f'Checking (and modifying) pipeline permissions for variable group: "{variableGroup["name"]}"'
+                    )
+                    if not self._cicd.authorizePipelineForResourceAccess(
+                        projectId, pipelineId, variableGroup, "variablegroup"
+                    ):
+                        continue
+
+                    variableGroupName = variableGroup.get("name")
+
+                    logger.info(f'Extracting secrets for variable group: "{variableGroupName}"')
+                    runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+                    if runId:
+                        self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+                        if self._fileName:
+                            self.__extractPipelineOutput(projectId, self._resType["doubleb64"])
+
+                        logger.empty_line()
+
+            else:
+                logger.info("No variable groups found")
 
     def __extractSecureFiles(self, projectId, pipelineId):
         logger.verbose(f"Getting secure files")
 
-        secureFiles = self._cicd.listProjectSecureFiles(projectId)
+        try:
+            secureFiles = self._cicd.listProjectSecureFiles(projectId)
+        except DevOpsError as e:
+            logger.error(e)
 
-        if secureFiles:
-            for secureFile in secureFiles:
-                pipelineGenerator = DevOpsPipelineGenerator()
-                pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"])
-
-                logger.verbose(
-                    f'Checking (and modifying) pipeline permissions for the secure file: "{secureFile["name"]}"'
-                )
-                if not self._cicd.authorizePipelineForResourceAccess(projectId, pipelineId, secureFile, "securefile"):
-                    continue
-
-                logger.info(f'Extracting secure file: "{secureFile["name"]}"')
-                runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
-                if runId:
-                    self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
-                    if self._fileName:
-                        date = time.strftime("%Y-%m-%d_%H-%M-%S")
-                        safeSecureFilename = "".join(
-                            [c for c in secureFile["name"] if c.isalpha() or c.isdigit() or c in (" ", ".")]
-                        ).strip()
-                        self.__extractPipelineOutput(
-                            projectId, self._resType["doubleb64"], f"pipeline_{date}_secure_file_{safeSecureFilename}"
-                        )
-
-                    logger.empty_line()
         else:
-            logger.info("No secure files found")
+            if secureFiles:
+                for secureFile in secureFiles:
+                    pipelineGenerator = DevOpsPipelineGenerator()
+                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"])
+
+                    logger.verbose(
+                        f'Checking (and modifying) pipeline permissions for the secure file: "{secureFile["name"]}"'
+                    )
+                    if not self._cicd.authorizePipelineForResourceAccess(
+                        projectId, pipelineId, secureFile, "securefile"
+                    ):
+                        continue
+
+                    logger.info(f'Extracting secure file: "{secureFile["name"]}"')
+                    runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+                    if runId:
+                        self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+                        if self._fileName:
+                            date = time.strftime("%Y-%m-%d_%H-%M-%S")
+                            safeSecureFilename = "".join(
+                                [c for c in secureFile["name"] if c.isalpha() or c.isdigit() or c in (" ", ".")]
+                            ).strip()
+                            self.__extractPipelineOutput(
+                                projectId,
+                                self._resType["doubleb64"],
+                                f"pipeline_{date}_secure_file_{safeSecureFilename}",
+                            )
+
+                        logger.empty_line()
+            else:
+                logger.info("No secure files found")
 
     def __extractGitHubSecrets(self, projectId, pipelineId, sc):
         endpoint = sc.get("name")
@@ -367,34 +408,69 @@ class DevOpsRunner:
         logger.empty_line()
 
     def __extractAzureRMSecrets(self, projectId, pipelineId, sc):
-        if sc.get("data").get("scopeLevel").lower() == "subscription":
-            if sc.get("authorization").get("scheme").lower() == "serviceprincipal":
-                name = sc.get("name")
-                pipelineGenerator = DevOpsPipelineGenerator()
-                pipelineGenerator.generatePipelineForAzureRm(name)
 
-                logger.info(f'Extracting secrets for AzureRM: "{name}"')
-                runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
-                if runId:
-                    self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
-                    if self._fileName:
-                        self.__extractPipelineOutput(projectId, self._resType["azurerm"])
+        scheme = sc.get("authorization").get("scheme").lower()
+        if scheme == "serviceprincipal":
+            name = sc.get("name")
+            pipelineGenerator = DevOpsPipelineGenerator()
+            pipelineGenerator.generatePipelineForAzureRm(name)
 
-                    logger.empty_line()
+            logger.info(f'Extracting secrets for AzureRM: "{name}"')
+            runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+            if runId:
+                self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+                if self._fileName:
+                    self.__extractPipelineOutput(projectId, self._resType["azurerm"])
+
+                logger.empty_line()
+        else:
+            logger.error(f"Unsupported scheme: {scheme}")
+
+    def __extractAWSSecrets(self, projectId, pipelineId, sc):
+
+        scheme = sc.get("authorization").get("scheme").lower()
+        if scheme == "usernamepassword":
+
+            name = sc.get("name")
+
+            pipelineGenerator = DevOpsPipelineGenerator()
+            pipelineGenerator.generatePipelineForAWS(name)
+
+            logger.info(f'Extracting secrets for AzureRM: "{name}"')
+            runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+            if runId:
+                self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+                if self._fileName:
+                    self.__extractPipelineOutput(projectId, self._resType["doubleb64"])
+
+                logger.empty_line()
+        else:
+            logger.error(f"Unsupported scheme: {scheme}")
 
     def __extractServiceConnectionsSecrets(self, projectId, pipelineId):
-        serviceConnections = self._cicd.listServiceConnections(projectId)
 
-        for sc in serviceConnections:
-            logger.verbose(f'Checking (and modifying) pipeline permissions for the service connection: "{sc["name"]}"')
-            if not self._cicd.authorizePipelineForResourceAccess(projectId, pipelineId, sc, "endpoint"):
-                continue
+        try:
+            serviceConnections = self._cicd.listServiceConnections(projectId)
+        except DevOpsError as e:
+            logger.error(e)
+        else:
+            for sc in serviceConnections:
 
-            scType = sc.get("type").lower()
-            if scType == "azurerm":
-                self.__extractAzureRMSecrets(projectId, pipelineId, sc)
-            elif scType == "github":
-                self.__extractGitHubSecrets(projectId, pipelineId, sc)
+                scType = sc.get("type").lower()
+
+                if scType in self._allowedTypes:
+                    logger.verbose(
+                        f'Checking (and modifying) pipeline permissions for the service connection: "{sc["name"]}"'
+                    )
+                    if not self._cicd.authorizePipelineForResourceAccess(projectId, pipelineId, sc, "endpoint"):
+                        continue
+
+                    if self._extractAzureServiceconnections and scType == "azurerm":
+                        self.__extractAzureRMSecrets(projectId, pipelineId, sc)
+                    elif self._extractGitHubServiceconnections and scType == "github":
+                        self.__extractGitHubSecrets(projectId, pipelineId, sc)
+                    elif scType == "aws":
+                        self.__extractAWSSecrets(projectId, pipelineId, sc)
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")

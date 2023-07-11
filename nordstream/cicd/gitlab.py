@@ -9,7 +9,7 @@ COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 
 
 class GitLab:
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test"
+    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test/v1"
     _auth = None
     _session = None
     _token = None
@@ -21,7 +21,6 @@ class GitLab:
     _verifyCert = True
     _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
-    _sleepTimeOutput = 6
     _maxRetry = 10
 
     def __init__(self, url, token):
@@ -336,8 +335,8 @@ class GitLab:
 
         if response.status_code != 200:
             for i in range(self._maxRetry):
-                logger.warning(f"Output not ready, sleeping for {self._sleepTimeOutput}s")
-                time.sleep(self._sleepTimeOutput)
+                logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
+                time.sleep(self._sleepTime)
                 response = self._session.get(
                     f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
                     headers=self._header,
