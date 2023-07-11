@@ -106,7 +106,7 @@ def start(argv):
         devopsRunner.extractAzureServiceconnections = not args["--no-az"]
     if args["--no-gh"]:
         devopsRunner.extractGitHubServiceconnections = not args["--no-gh"]
-    if ars["--no-aws"]:
+    if args["--no-aws"]:
         devopsRunner.extractAWSServiceconnections = not args["--no-aws"]
     if args["--no-clean"]:
         devopsRunner.cleanLogs = not args["--no-clean"]
