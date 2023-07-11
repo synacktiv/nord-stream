@@ -449,7 +449,7 @@ class DevOpsRunner:
             pipelineGenerator = DevOpsPipelineGenerator()
             pipelineGenerator.generatePipelineForAWS(name)
 
-            logger.info(f'Extracting secrets for AzureRM: "{name}"')
+            logger.info(f'Extracting secrets for AWS: "{name}"')
             runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
             if runId:
                 self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
