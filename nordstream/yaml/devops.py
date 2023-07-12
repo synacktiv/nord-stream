@@ -11,7 +11,7 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                 "displayName": taskName,
                 "inputs": {
                     "targetType": "inline",
-                    "script": 'sh -c "env | grep \\"^secret_\\" | base64 -w0 | base64 -w0;' ' echo  ;"',
+                    "script": "env -0 | awk -v RS='\\0' '/^secret_/ {print $0}' | base64 -w0 | base64 -w0 ; echo ",
                 },
                 "env": "#FIXME",
             }
