@@ -406,11 +406,15 @@ class GitHubWorkflowRunner:
 
         else:
             self._cicd.listRepos()
+
         if self._writeAccessFilter:
             self._cicd.filterWriteRepos()
 
         if len(self._cicd.repos) == 0:
-            logger.critical("No repository found.")
+            if self._writeAccessFilter:
+                logger.critical("No repository with write access found.")
+            else:
+                logger.critical("No repository found.")
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")
@@ -531,8 +535,10 @@ class GitHubWorkflowRunner:
             Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
+
+                protections = None
                 if not self._forceDeploy:
-                    self.__checkAndDisableBranchProtectionRules(repo)
+                    protections = self.__checkAndDisableBranchProtectionRules(repo)
                 self.__createWorkflowDir()
 
                 if self._yaml:
@@ -552,7 +558,12 @@ class GitHubWorkflowRunner:
                     logger.exception(e)
 
             finally:
+
                 self.__clean(repo)
+
+                if protections:
+                    self.__resetBranchProtectionRules(repo, protections)
+
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
 
@@ -611,6 +622,7 @@ class GitHubWorkflowRunner:
             if pushOutput.returncode != 0:
                 logger.error("Error when pushing code:")
                 logger.raw(pushOutput.communicate()[1], logging.INFO)
+                return True
             else:
                 self._pushedCommitsCount += 1
 
@@ -673,31 +685,57 @@ class GitHubWorkflowRunner:
         )
 
     def __checkAndDisableBranchProtectionRules(self, repo):
+
+        protectionEnabled, protection = self.__checkAndGetBranchProtectionRules(repo)
+
+        if protectionEnabled:
+
+            if protection:
+                self._displayBranchProtectionRules(protection)
+            else:
+                logger.info(
+                    "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
+                )
+
+            if protection and self.disableProtections:
+                logger.info("Removing protection")
+                self._cicd.disableBranchProtectionRules(repo)
+                return protection
+
+            elif self.disableProtections:
+                # if we can't list protection this means that we don't have enough privileges
+                raise Exception(
+                    "Not enough privileges to disable protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
+                )
+            else:
+                raise Exception("branch protection rule enabled but '--disable-protections' not activated")
+
+        return None
+
+    def __checkAndGetBranchProtectionRules(self, repo):
         protectionEnabled = self._checkBranchProtectionRules(repo)
 
         if protectionEnabled:
             logger.info(f'Found branch protection rule on "{self._cicd.branchName}" branch')
             try:
                 protection = self._cicd.getBranchesProtectionRules(repo)
-
-                if protection:
-                    self._displayBranchProtectionRules(protection)
-                else:
-                    logger.info("Not enough privileges to display rules")
-
-                if protection and self.disableProtections:
-                    logger.info("Removing protection")
-                    self._cicd.disableBranchProtectionRules(repo)
-                elif self.disableProtections:
-                    # if we can't list protection this means that we don't have enough privileges
-                    raise Exception("branch protection rule enabled but not enough privileges to disable it.")
-                else:
-                    raise Exception("branch protection rule enabled but '--disable-protections' not activated")
+                return True, protection
 
             except GitHubError:
-                pass
+                return True, None
         else:
             logger.info(f'No branch protection rule found on "{self._cicd.branchName}" branch')
+        return False, None
+
+    def __resetBranchProtectionRules(self, repo, protections):
+
+        data = {
+            "enforce_admins": protections.get("enforce_admins").get("enabled"),
+            "allow_deletions": protections.get("allow_deletions").get("enabled"),
+            "allow_force_pushes": protections.get("allow_force_pushes").get("enabled"),
+        }
+
+        self._cicd.updateBranchesProtectionRules(repo, protections)
 
     def checkBranchProtections(self):
         for repo in self._cicd.repos:
@@ -717,15 +755,24 @@ class GitHubWorkflowRunner:
             Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
 
             try:
-                self.__checkAndDisableBranchProtectionRules(repo)
+                protectionEnabled, protection = self.__checkAndGetBranchProtectionRules(repo)
+
+                if protectionEnabled:
+                    if protection:
+                        self._displayBranchProtectionRules(protection)
+                    else:
+                        logger.info(
+                            "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
+                        )
+
+                self.__checkAllEnvSecurity(repo)
+
             except Exception:
                 pass
             finally:
                 self.__clean(repo)
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
-
-            self.__checkAllEnvSecurity(repo)
 
     def __checkAndDisableEnvProtections(self, repo, env):
         envDetails = self._cicd.getEnvDetails(repo, env)

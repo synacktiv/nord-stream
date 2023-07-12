@@ -174,7 +174,7 @@ class GitHub:
             headers=self._header,
         ).json()
 
-        if response.get("total_count", 0) >= 0:
+        if response.get("total_count") != None and response.get("total_count") >= 0:
             for sec in response.get("secrets") or []:
                 res.append(sec.get("name"))
         else:
@@ -236,7 +236,6 @@ class GitHub:
             headers=self._header,
         ).json()
 
-        logger.debug(response)
         if response.get("message"):
             raise GitHubError(response.get("message"))
 
@@ -277,6 +276,7 @@ class GitHub:
             auth=self._auth,
             headers=self._header,
         ).json()
+
         if response.get("name") and response.get("protected"):
             data = {
                 "required_status_checks": None,
@@ -312,7 +312,6 @@ class GitHub:
             headers=self._header,
         ).json()
 
-        logger.debug(response)
         if response.get("message"):
             raise GitHubError(response.get("message"))
         return response
@@ -339,6 +338,21 @@ class GitHub:
             auth=self._auth,
             headers=self._header,
         ).json()
+        if response.get("message"):
+            return None
+        return response
+
+    def updateBranchesProtectionRules(self, repo, protections):
+        logger.debug("Updating branch protection rules")
+        response = self._session.put(
+            f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
+            auth=self._auth,
+            headers=self._header,
+            json=protections,
+        ).json()
+
+        logger.debug(response)
+
         if response.get("message"):
             return None
         return response

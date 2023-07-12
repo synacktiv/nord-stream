@@ -2,8 +2,8 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections)[--project <project> --group <group> --no-project --no-group --no-instance]
-    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group>]
+    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
+    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
     nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream.py gitlab [options] --token <pat> --describe-token

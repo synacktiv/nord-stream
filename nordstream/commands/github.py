@@ -2,13 +2,13 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --write-filter --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --write-filter --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
-    nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env> --write-filter]
+    nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
     nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --write-filter --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream.py github [options] --token <ghp> --describe-token
@@ -143,6 +143,7 @@ def start(argv):
         gitHubWorkflowRunner.listGitHubSecrets()
 
     elif args["--build-yaml"]:
+        gitHubWorkflowRunner.writeAccessFilter = True
         gitHubWorkflowRunner.workflowFilename = args["--build-yaml"]
         gitHubWorkflowRunner.createYaml(args["--repo"])
 
@@ -155,9 +156,11 @@ def start(argv):
             gitHubWorkflowRunner.manualCleanBranchPolicy()
 
     elif args["--list-protections"]:
+        gitHubWorkflowRunner.writeAccessFilter = True
         gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.checkBranchProtections()
 
     else:
+        gitHubWorkflowRunner.writeAccessFilter = True
         gitHubWorkflowRunner.getRepos(args["--repo"])
         gitHubWorkflowRunner.runWorkflow()

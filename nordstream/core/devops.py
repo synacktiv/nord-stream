@@ -130,7 +130,10 @@ class DevOpsRunner:
             self._cicd.filterWriteProjects()
 
         if len(self._cicd.projects) == 0:
-            logger.critical("No repository found.")
+            if self._writeAccessFilter:
+                logger.critical("No project with write access found.")
+            else:
+                logger.critical("No project found.")
 
     def listProjectSecrets(self):
         logger.info("Listing secrets")

@@ -98,7 +98,10 @@ class GitLabRunner:
             self._cicd.addProject(filterWrite=self._writeAccessFilter)
 
         if len(self._cicd.projects) == 0:
-            logger.critical("No repository found.")
+            if self._writeAccessFilter:
+                logger.critical("No repository with write access found.")
+            else:
+                logger.critical("No repository found.")
 
     def getGroups(self, group):
         if group:
