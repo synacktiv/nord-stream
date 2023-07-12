@@ -223,6 +223,8 @@ class DevOpsRunner:
             pipelineGenerator.generatePipelineForGitHub("#FIXME")
         elif pipelineType == "azurerm":
             pipelineGenerator.generatePipelineForAzureRm("#FIXME")
+        elif pipelineType == "aws":
+            pipelineGenerator.generatePipelineForAWS("#FIXME")
         else:
             pipelineGenerator.defaultTemplate = ""
             logger.error(f"Invalid type: {pipelineType}")

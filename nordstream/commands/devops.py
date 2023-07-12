@@ -38,7 +38,7 @@ args
     --list-secrets                          List all secrets.
     --write-filter                          Filter projects where current user has write or admin access.
     --build-yaml <output>                   Create a pipeline yaml file with default configuration.
-    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github
+    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws
     --describe-token                        Display information on the token
     --branch-name <name>                    Use specific branch name for deployment.
     --pipeline-name <name>                  Use pipeline for deployment.
