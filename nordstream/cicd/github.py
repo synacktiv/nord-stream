@@ -178,7 +178,10 @@ class GitHub:
             for sec in response.get("secrets") or []:
                 res.append(sec.get("name"))
         else:
-            raise GitHubError(response.get("message"))
+
+            # I already saw "Resource not accessible by integration" and token had write access
+            if response.get("message") == "Not Found":
+                raise GitHubError(response.get("message"))
         return res
 
     def listOrganizationSecretsFromRepo(self, repo):

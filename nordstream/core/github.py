@@ -1,5 +1,6 @@
 import logging
 import base64
+import glob
 from zipfile import ZipFile
 from os import makedirs, chdir
 from os.path import exists, realpath
@@ -12,7 +13,7 @@ import subprocess
 
 class GitHubWorkflowRunner:
     _cicd = None
-    _taskName = "2_command.txt"
+    _taskName = "command"
     _workflowFilename = "init_ZkITM.yaml"
     _fileName = None
     _env = None
@@ -189,7 +190,8 @@ class GitHubWorkflowRunner:
 
     def __extractSensitiveInformationFromWorkflowResult(self, repo, informationType="Secrets"):
         name = self._fileName.strip(".zip")
-        with open(f"{self._cicd.outputDir}/{repo}/{name}/init/{self._taskName}", "r") as output:
+        filePath = glob.glob(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")[0]
+        with open(filePath, "r") as output:
             # well it's working
             data = output.readlines()[-1].split(" ")[1]
 
@@ -205,7 +207,8 @@ class GitHubWorkflowRunner:
 
     def __getWorkflowOutput(self, repo):
         name = self._fileName.strip(".zip")
-        with open(f"{self._cicd.outputDir}/{repo}/{name}/init/{self._taskName}", "r") as output:
+        filePath = glob.glob(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")[0]
+        with open(filePath, "r") as output:
             logger.success("Workflow output:")
             line = output.readline()
             while line != "":
