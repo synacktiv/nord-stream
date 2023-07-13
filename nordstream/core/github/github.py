@@ -10,6 +10,7 @@ from nordstream.core.github.protections import (
     resetRequiredPullRequestReviews,
     resetRestrictions,
 )
+from nordstream.core.github.display import *
 from nordstream.utils.errors import GitHubError
 from nordstream.utils.log import logger
 from nordstream.git import Git
@@ -381,26 +382,17 @@ class GitHubWorkflowRunner:
 
     def __displayRepoSecrets(self, repo):
         secrets = self._cicd.listSecretsFromRepo(repo)
-        if len(secrets) != 0:
-            logger.info("Repo secrets:")
-            for secret in secrets:
-                logger.raw(f"\t- {secret}\n", logging.INFO)
+        displayRepoSecrets(secrets)
 
     def __displayEnvSecrets(self, repo):
         envs = self._cicd.listEnvFromrepo(repo)
         for env in envs:
             secrets = self._cicd.listSecretsFromEnv(repo, env)
-            if len(secrets) != 0:
-                logger.info(f"{env} secrets:")
-                for secret in secrets:
-                    logger.raw(f"\t- {secret}\n", logging.INFO)
+            displayEnvSecrets(env, secrets)
 
     def __displayOrgSecrets(self, repo):
         secrets = self._cicd.listOrganizationSecretsFromRepo(repo)
-        if len(secrets) != 0:
-            logger.info("Repository organization secrets:")
-            for secret in secrets:
-                logger.raw(f"\t- {secret}\n", logging.INFO)
+        displayOrgSecrets(secrets)
 
     def getRepos(self, repo):
         if repo:
@@ -583,38 +575,9 @@ class GitHubWorkflowRunner:
         for env in self._cicd.listEnvFromrepo(repo):
             self.__checkSingleEnvSecurity(repo, env)
 
-    @staticmethod
-    def __displayEnvSecurity(envDetails):
-        protectionRules = envDetails.get("protection_rules")
-        envName = envDetails.get("name")
-
-        if len(protectionRules) > 0:
-            logger.info(f'Environment protection for: "{envName}":')
-            for protection in protectionRules:
-                if protection.get("type") == "required_reviewers":
-                    for reviewer in protection.get("reviewers"):
-                        reviewerType = reviewer.get("type")
-                        login = reviewer.get("reviewer").get("login")
-                        userId = reviewer.get("reviewer").get("id")
-                        logger.raw(
-                            f"\t- reviewer ({reviewerType}): {login}/{userId}\n",
-                            logging.INFO,
-                        )
-                elif protection.get("type") == "wait_timer":
-                    wait = protection.get("wait_timer")
-                    logger.raw(f"\t- timer: {wait} min\n", logging.INFO)
-                else:
-                    branchPolicy = envDetails.get("deployment_branch_policy")
-                    if branchPolicy.get("custom_branch_policies", False):
-                        logger.raw(f"\t- deployment branch policy: custom\n", logging.INFO)
-                    else:
-                        logger.raw(f"\t- deployment branch policy: protected\n", logging.INFO)
-        else:
-            logger.info("No environment protection rule found")
-
     def __checkSingleEnvSecurity(self, repo, env):
         envDetails = self._cicd.getEnvDetails(repo, env)
-        self.__displayEnvSecurity(envDetails)
+        displayEnvSecurity(envDetails)
 
     def _checkBranchProtectionRules(self, repo):
         protectionEnabled = False
@@ -642,58 +605,6 @@ class GitHubWorkflowRunner:
                 pass
         return protectionEnabled
 
-    @staticmethod
-    def _displayBranchProtectionRules(protections):
-        logger.info("Branch protections:")
-
-        if protections.get("required_pull_request_reviews"):
-            logger.raw(
-                "\t- required pull request reviews:"
-                f' {protections.get("required_pull_request_reviews").get("enabled", True)}\n',
-                logging.INFO,
-            )
-        else:
-            logger.raw(f"\t- required pull request reviews: False\n", logging.INFO)
-        logger.raw(f'\t- restrictions: {"restrictions" in protections}\n', logging.INFO)
-        logger.raw(f'\t- required status checks: {"required_status_checks" in protections}\n', logging.INFO)
-        logger.raw(
-            "\t- required signatures:" f' {protections.get("required_signatures").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            f'\t- enforce admins: {protections.get("enforce_admins").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- required linear history:" f' {protections.get("required_linear_history").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- allow force pushes:" f' {protections.get("allow_force_pushes").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- allow deletions:" f' {protections.get("allow_deletions").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- block creations:" f' {protections.get("block_creations").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- required conversation resolution:"
-            f' {protections.get("required_conversation_resolution").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            f'\t- lock branch: {protections.get("lock_branch").get("enabled")}\n',
-            logging.INFO,
-        )
-        logger.raw(
-            "\t- allow fork syncing:" f' {protections.get("allow_fork_syncing").get("enabled")}\n',
-            logging.INFO,
-        )
-
     def __checkAndDisableBranchProtectionRules(self, repo):
 
         protectionEnabled, protection = self.__checkAndGetBranchProtectionRules(repo)
@@ -701,7 +612,7 @@ class GitHubWorkflowRunner:
         if protectionEnabled:
 
             if protection:
-                self._displayBranchProtectionRules(protection)
+                displayBranchProtectionRules(protection)
             else:
                 logger.info(
                     "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
@@ -759,7 +670,7 @@ class GitHubWorkflowRunner:
 
                 if protectionEnabled:
                     if protection:
-                        self._displayBranchProtectionRules(protection)
+                        displayBranchProtectionRules(protection)
                     else:
                         logger.info(
                             "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
@@ -783,7 +694,7 @@ class GitHubWorkflowRunner:
         policyId = None
 
         if len(protectionRules) > 0 and self._disableProtections:
-            self.__displayEnvSecurity(envDetails)
+            displayEnvSecurity(envDetails)
 
             try:
                 logger.info("Modifying protections")
@@ -807,7 +718,7 @@ class GitHubWorkflowRunner:
                 raise Exception("Environment protection rule enabled but not enough privileges to disable it.")
 
         elif len(protectionRules) > 0 and not self._disableProtections:
-            self.__displayEnvSecurity(envDetails)
+            displayEnvSecurity(envDetails)
             raise Exception("Environment protection rule enabled but '--disable-protections' not activated")
         else:
             logger.verbose("No environment protection rule found")

@@ -94,5 +94,5 @@ def getUsersArray(users):
 def getTeamsOrAppsArray(data):
     res = []
     for e in data:
-        res.append(user.get("slugs"))
+        res.append(e.get("slug"))
     return res
