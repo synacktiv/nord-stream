@@ -5,6 +5,11 @@ from zipfile import ZipFile
 from os import makedirs, chdir
 from os.path import exists, realpath
 from nordstream.yaml.github import WorkflowGenerator
+from nordstream.core.github.protections import (
+    resetRequiredStatusCheck,
+    resetRequiredPullRequestReviews,
+    resetRestrictions,
+)
 from nordstream.utils.errors import GitHubError
 from nordstream.utils.log import logger
 from nordstream.git import Git
@@ -510,11 +515,13 @@ class GitHubWorkflowRunner:
         return True
 
     def __clean(self, repo):
-        if self._cleanLogs:
-            logger.info("Cleaning logs.")
-            self._cicd.cleanAllLogs(repo, self._workflowFilename)
 
         if self._pushedCommitsCount > 0:
+
+            if self._cleanLogs:
+                logger.info("Cleaning logs.")
+                self._cicd.cleanAllLogs(repo, self._workflowFilename)
+
             logger.verbose("Cleaning commits.")
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                 Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
@@ -701,7 +708,7 @@ class GitHubWorkflowRunner:
                 )
 
             if protection and self.disableProtections:
-                logger.info("Removing protection")
+                logger.warning("Removing branch protection, wait until they are restored.")
                 self._cicd.disableBranchProtectionRules(repo)
                 return protection
 
@@ -729,16 +736,6 @@ class GitHubWorkflowRunner:
         else:
             logger.info(f'No branch protection rule found on "{self._cicd.branchName}" branch')
         return False, None
-
-    def __resetBranchProtectionRules(self, repo, protections):
-
-        data = {
-            "enforce_admins": protections.get("enforce_admins").get("enabled"),
-            "allow_deletions": protections.get("allow_deletions").get("enabled"),
-            "allow_force_pushes": protections.get("allow_force_pushes").get("enabled"),
-        }
-
-        self._cicd.updateBranchesProtectionRules(repo, protections)
 
     def checkBranchProtections(self):
         for repo in self._cicd.repos:
@@ -849,3 +846,25 @@ class GitHubWorkflowRunner:
         company = response.get("company")
         if company != None:
             logger.raw(f"\t- Company: {company}\n", logging.INFO)
+
+    def __resetBranchProtectionRules(self, repo, protections):
+
+        logger.warning("Restoring protection.")
+
+        data = {}
+
+        data["required_status_checks"] = resetRequiredStatusCheck(protections)
+        data["required_pull_request_reviews"] = resetRequiredPullRequestReviews(protections)
+        data["restrictions"] = resetRestrictions(protections)
+
+        data["enforce_admins"] = protections.get("enforce_admins").get("enabled")
+        data["allow_deletions"] = protections.get("allow_deletions").get("enabled")
+        data["allow_force_pushes"] = protections.get("allow_force_pushes").get("enabled")
+        data["block_creations"] = protections.get("block_creations").get("enabled")
+
+        res = self._cicd.updateBranchesProtectionRules(repo, data)
+
+        msg = res.get("message")
+        if msg:
+            logger.error(f"Fail to restore protection: {msg}")
+            logger.info(f"Raw protections: {protections}")

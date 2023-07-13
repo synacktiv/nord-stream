@@ -272,7 +272,6 @@ class GitHub:
                     )
 
     def disableBranchProtectionRules(self, repo):
-        # TODO: restore modified branch protection rules if an existing branch was used for the deployment
         logger.debug("Modifying branch protection")
         response = self._session.get(
             f"{self._repoURL}/{repo}/branches/{self._branchName}",
@@ -287,12 +286,7 @@ class GitHub:
                 "required_pull_request_reviews": None,
                 "restrictions": None,
                 "allow_deletions": True,
-                "required_linear_history": False,
                 "allow_force_pushes": True,
-                "block_creations": False,
-                "required_conversation_resolution": False,
-                "lock_branch": False,
-                "allow_fork_syncing": False,
             }
             self._session.put(
                 f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
@@ -347,6 +341,7 @@ class GitHub:
 
     def updateBranchesProtectionRules(self, repo, protections):
         logger.debug("Updating branch protection rules")
+
         response = self._session.put(
             f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
             auth=self._auth,
@@ -354,10 +349,6 @@ class GitHub:
             json=protections,
         ).json()
 
-        logger.debug(response)
-
-        if response.get("message"):
-            return None
         return response
 
     def cleanDeploymentsLogs(self, repo):

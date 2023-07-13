@@ -560,18 +560,21 @@ class DevOpsRunner:
 
     def __clean(self, projectId, repoId, deleteRemoteRepo, deleteRemotePipeline):
         if self._cleanLogs:
-            logger.info(f"Cleaning logs for project: {projectId}")
-            self._cicd.cleanAllLogs(projectId)
-
             if deleteRemotePipeline:
+                logger.verbose("Deleting remote pipeline.")
                 self._cicd.deletePipeline(projectId)
 
         if deleteRemoteRepo:
-            logger.verbose("Deleting remote repository")
+            logger.verbose("Deleting remote repository.")
             self._cicd.deleteGit(projectId, repoId)
 
         else:
             if self._pushedCommitsCount > 0:
+
+                if self._cleanLogs:
+                    logger.info(f"Cleaning logs for project: {projectId}")
+                    self._cicd.cleanAllLogs(projectId)
+
                 logger.verbose("Cleaning commits.")
                 if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                     Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)

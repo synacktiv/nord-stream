@@ -335,12 +335,14 @@ class GitLabRunner:
         logger.raw(pipelineResults, logging.INFO)
 
     def __clean(self, project):
-        projectId = project.get("id")
-        if self._cleanLogs:
-            logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
-            self._cicd.cleanAllLogs(projectId)
 
         if self._pushedCommitsCount > 0:
+
+            projectId = project.get("id")
+            if self._cleanLogs:
+                logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
+                self._cicd.cleanAllLogs(projectId)
+
             logger.verbose("Cleaning commits.")
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                 Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)

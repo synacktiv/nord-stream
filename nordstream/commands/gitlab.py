@@ -49,7 +49,7 @@ Examples:
 
 from docopt import docopt
 from nordstream.cicd.gitlab import GitLab
-from nordstream.core.gitlab import GitLabRunner
+from nordstream.core.gitlab.gitlab import GitLabRunner
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 

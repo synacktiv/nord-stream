@@ -56,7 +56,7 @@ Authors: @hugow @0hexit
 
 from docopt import docopt
 from nordstream.cicd.devops import DevOps
-from nordstream.core.devops import DevOpsRunner
+from nordstream.core.devops.devops import DevOpsRunner
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 
