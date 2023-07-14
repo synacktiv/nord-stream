@@ -247,6 +247,7 @@ class GitHub:
         return policyId
 
     def deleteDeploymentBranchPolicy(self, repo, env):
+        logger.debug("Delete deployment branch policy")
         envReq = urllib.parse.quote(env, safe="")
         response = self._session.get(
             f"{self._repoURL}/{repo}/environments/{envReq}",

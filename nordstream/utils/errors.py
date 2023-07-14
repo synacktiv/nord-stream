@@ -14,5 +14,9 @@ class GitError(Exception):
     pass
 
 
+class GitPushError(GitError):
+    pass
+
+
 class RepoCreationError(Exception):
     pass

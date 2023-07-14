@@ -3,21 +3,21 @@ import logging
 from nordstream.core.github.protections import getUsersArray, getTeamsOrAppsArray
 
 
-def displayRepoSecrets(self, secrets):
+def displayRepoSecrets(secrets):
     if len(secrets) != 0:
         logger.info("Repo secrets:")
         for secret in secrets:
             logger.raw(f"\t- {secret}\n", logging.INFO)
 
 
-def displayEnvSecrets(self, env, secrets):
+def displayEnvSecrets(env, secrets):
     if len(secrets) != 0:
         logger.info(f"{env} secrets:")
         for secret in secrets:
             logger.raw(f"\t- {secret}\n", logging.INFO)
 
 
-def displayOrgSecrets(self, secrets):
+def displayOrgSecrets(secrets):
     if len(secrets) != 0:
         logger.info("Repository organization secrets:")
         for secret in secrets:

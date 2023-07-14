@@ -11,7 +11,7 @@ from nordstream.core.github.protections import (
     resetRestrictions,
 )
 from nordstream.core.github.display import *
-from nordstream.utils.errors import GitHubError
+from nordstream.utils.errors import GitHubError, GitPushError
 from nordstream.utils.log import logger
 from nordstream.git import Git
 import subprocess
@@ -258,12 +258,14 @@ class GitHubWorkflowRunner:
         if len(secrets) > 0:
             workflowGenerator = WorkflowGenerator()
             workflowGenerator.generateWorkflowForSecretsExtraction(secrets)
-            if self.__launchWorkflow(repo, workflowGenerator, "repo"):
+
+            if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "repo", self._env):
                 self.__extractSensitiveInformationFromWorkflowResult(repo)
-            logger.empty_line()
 
         else:
             logger.info("No secret found")
+
+        logger.empty_line()
 
     def __extractSecretsFromSingleEnv(self, repo, env):
         logger.info(f'Getting secrets from environment: "{env}" ({repo})')
@@ -277,29 +279,14 @@ class GitHubWorkflowRunner:
         if len(secrets) > 0:
             workflowGenerator = WorkflowGenerator()
             workflowGenerator.generateWorkflowForSecretsExtraction(secrets, env)
-            policyId = waitTime = reviewers = branchPolicy = None
 
-            try:
-                if not self._forceDeploy:
-                    (
-                        policyId,
-                        waitTime,
-                        reviewers,
-                        branchPolicy,
-                    ) = self.__checkAndDisableEnvProtections(repo, env)
-
-                if self.__launchWorkflow(repo, workflowGenerator, f"env_{env}"):
-                    self.__extractSensitiveInformationFromWorkflowResult(repo)
-            except Exception as e:
-                logger.error(f"Error: {e}")
-
-            finally:
-                if self._disableProtections and policyId:
-                    self.__restoreEnvProtections(repo, env, policyId, waitTime, reviewers, branchPolicy)
-                logger.empty_line()
+            if self.__generateAndLaunchWorkflow(repo, workflowGenerator, f"env_{env}", env):
+                self.__extractSensitiveInformationFromWorkflowResult(repo)
 
         else:
             logger.info("No secret found")
+
+        logger.empty_line()
 
     def __extractSecretsFromAllEnv(self, repo):
         for env in self._cicd.listEnvFromrepo(repo):
@@ -311,7 +298,51 @@ class GitHubWorkflowRunner:
         else:
             self.__extractSecretsFromAllEnv(repo)
 
-    def __launchWorkflow(self, repo, workflowGenerator, outputName):
+    def __generateAndLaunchWorkflow(self, repo, workflowGenerator, outputName, env=None):
+
+        policyId = waitTime = reviewers = branchPolicy = envDetails = None
+
+        try:
+
+            # disable env protection before launching the workflow if no '--force' and env is not null
+            if not self._forceDeploy and env:
+
+                # check protection and if enabled return the protections
+                envDetails = self.__isEnvProtectionsEnabled(repo, env)
+                if envDetails and len(envDetails.get("protection_rules")):
+
+                    # if --disable-protection disable the env protections
+                    if self._disableProtections:
+                        (
+                            policyId,
+                            waitTime,
+                            reviewers,
+                            branchPolicy,
+                        ) = self.__disableEnvProtections(repo, envDetails)
+                    else:
+                        raise Exception("Environment protection rule enabled but '--disable-protections' not activated")
+
+            # start the workflow
+            workflowId, workflowConclusion = self.__launchWorkflow(repo, workflowGenerator)
+
+            # check workflow status and get result if it's ok
+            return self.__postProcessingWorkflow(repo, workflowId, workflowConclusion, outputName)
+
+        except GitPushError as e:
+            pass
+
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            if logger.getEffectiveLevel() == logging.DEBUG:
+                logger.exception(e)
+
+        finally:
+
+            # restore protections
+            if self._disableProtections and envDetails:
+                self.__restoreEnvProtections(repo, env, policyId, waitTime, reviewers, branchPolicy)
+
+    def __launchWorkflow(self, repo, workflowGenerator):
         logger.verbose(f"Launching workflow.")
 
         workflowGenerator.writeFile(f".github/workflows/{self._workflowFilename}")
@@ -319,43 +350,42 @@ class GitHubWorkflowRunner:
         pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
-        try:
-            if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
-                logger.error("Error when pushing code: Everything up-to-date")
-                logger.warning(
-                    "Your trying to push the same code on an existing branch, modify the yaml file to push it."
-                )
+        if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+            logger.error("Error when pushing code: Everything up-to-date")
+            logger.warning("Your trying to push the same code on an existing branch, modify the yaml file to push it.")
+            raise GitPushError
 
-            elif pushOutput.returncode != 0:
-                logger.error("Error when pushing code:")
-                logger.raw(pushOutput.communicate()[1], logging.INFO)
+        elif pushOutput.returncode != 0:
+            logger.error("Error when pushing code:")
+            logger.raw(pushOutput.communicate()[1], logging.INFO)
+            raise GitPushError
 
-            else:
-                self._pushedCommitsCount += 1
+        else:
+            self._pushedCommitsCount += 1
 
-                logger.raw(pushOutput.communicate()[1])
-                workflowId, workflowConclusion = self._cicd.waitWorkflow(repo, self._workflowFilename)
+            logger.raw(pushOutput.communicate()[1])
+            workflowId, workflowConclusion = self._cicd.waitWorkflow(repo, self._workflowFilename)
 
-                if workflowId and workflowConclusion == "success":
-                    logger.success("Workflow has successfully terminated.")
-                    self._fileName = self._cicd.downloadWorkflowOutput(
-                        repo,
-                        f"{outputName.replace('/','_').replace(' ', '_')}",
-                        workflowId,
-                    )
-                    self.__extractWorkflowOutput(repo)
-                    return True
-                elif workflowId and workflowConclusion == "failure":
-                    logger.error("Workflow failure:")
-                    for reason in self._cicd.getFailureReason(repo, workflowId):
-                        logger.error(f"{reason}")
-                    return False
-                else:
-                    return False
-        except Exception as e:
-            logger.exception(e)
-        finally:
-            pass
+            return workflowId, workflowConclusion
+
+    def __postProcessingWorkflow(self, repo, workflowId, workflowConclusion, outputName):
+
+        if workflowId and workflowConclusion == "success":
+            logger.success("Workflow has successfully terminated.")
+            self._fileName = self._cicd.downloadWorkflowOutput(
+                repo,
+                f"{outputName.replace('/','_').replace(' ', '_')}",
+                workflowId,
+            )
+            self.__extractWorkflowOutput(repo)
+            return True
+        elif workflowId and workflowConclusion == "failure":
+            logger.error("Workflow failure:")
+            for reason in self._cicd.getFailureReason(repo, workflowId):
+                logger.error(f"{reason}")
+            return False
+        else:
+            return False
 
     def listGitHubRepos(self):
         logger.info("Listing all repos:")
@@ -432,29 +462,14 @@ class GitHubWorkflowRunner:
         workflowGenerator = WorkflowGenerator()
         workflowGenerator.loadFile(self._yaml)
 
-        policyId = waitTime = reviewers = branchPolicy = None
+        if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "custom", self._env):
+            self.__extractSensitiveInformationFromWorkflowResult(repo)
 
-        try:
-            if self._env and not self._forceDeploy:
-                (
-                    policyId,
-                    waitTime,
-                    reviewers,
-                    branchPolicy,
-                ) = self.__checkAndDisableEnvProtections(repo, self._env)
-
-            if self.__launchWorkflow(repo, workflowGenerator, "custom"):
-                self.__getWorkflowOutput(repo)
-        except Exception as e:
-            logger.error(f"Error: {e}")
-
-        finally:
-            if self._env and self._disableProtections and policyId:
-                self.__restoreEnvProtections(repo, self._env, policyId, waitTime, reviewers, branchPolicy)
-            logger.empty_line()
+        logger.empty_line()
 
     def __runOIDCTokenGenerationWorfklow(self, repo):
-        # FIXME: factorize code
+
+        self._taskName = "3_commands.txt"
         workflowGenerator = WorkflowGenerator()
         if self._tenantId is not None and self._subscriptionId is not None and self._clientId is not None:
             logger.info("Running OIDC Azure access tokens generation workflow")
@@ -467,26 +482,10 @@ class GitHubWorkflowRunner:
             informationType = "OIDC credentials"
             workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self._role, self._region, self._env)
 
-        policyId = waitTime = reviewers = branchPolicy = None
+        if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "oidc", self._env):
+            self.__extractSensitiveInformationFromWorkflowResult(repo, informationType=informationType)
 
-        try:
-            if not self._forceDeploy and self._env:
-                (
-                    policyId,
-                    waitTime,
-                    reviewers,
-                    branchPolicy,
-                ) = self.__checkAndDisableEnvProtections(repo, self._env)
-
-            if self.__launchWorkflow(repo, workflowGenerator, "oidc"):
-                self.__extractSensitiveInformationFromWorkflowResult(repo, informationType=informationType)
-        except Exception as e:
-            logger.error(f"Error: {e}")
-
-        finally:
-            if not self._forceDeploy and self._env and self._disableProtections:
-                self.__restoreEnvProtections(repo, self._env, policyId, waitTime, reviewers, branchPolicy)
-            logger.empty_line()
+        logger.empty_line()
 
     def __runSecretsExtractionWorkflow(self, repo):
         if self._extractRepo or self._extractOrg:
@@ -522,7 +521,7 @@ class GitHubWorkflowRunner:
                     # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                     Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
-    def runWorkflow(self):
+    def start(self):
 
         for repo in self._cicd.repos:
             logger.success(f'"{repo}"')
@@ -538,18 +537,13 @@ class GitHubWorkflowRunner:
 
             try:
 
+                # check and disable branch protection rules
                 protections = None
                 if not self._forceDeploy:
                     protections = self.__checkAndDisableBranchProtectionRules(repo)
-                self.__createWorkflowDir()
 
-                if self._yaml:
-                    self.__runCustomWorkflow(repo)
-                elif self._exploitOIDC:
-                    self._taskName = "3_commands.txt"
-                    self.__runOIDCTokenGenerationWorfklow(repo)
-                else:
-                    self.__runSecretsExtractionWorkflow(repo)
+                self.__createWorkflowDir()
+                self.__dispatchWorkflow(repo)
 
             except KeyboardInterrupt:
                 pass
@@ -563,13 +557,25 @@ class GitHubWorkflowRunner:
 
                 self.__clean(repo)
 
-                if protections:
-                    self.__resetBranchProtectionRules(repo, protections)
+                # if we are working with the default nord-stream branch we managed to
+                # delete the branch during the previous clean operation
+
+                if self._cicd.branchName != self._cicd.defaultBranchName:
+                    if protections:
+                        self.__resetBranchProtectionRules(repo, protections)
 
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
 
         logger.info(f"Check output: {self._cicd.outputDir}")
+
+    def __dispatchWorkflow(self, repo):
+        if self._yaml:
+            self.__runCustomWorkflow(repo)
+        elif self._exploitOIDC:
+            self.__runOIDCTokenGenerationWorfklow(repo)
+        else:
+            self.__runSecretsExtractionWorkflow(repo)
 
     def __checkAllEnvSecurity(self, repo):
         for env in self._cicd.listEnvFromrepo(repo):
@@ -619,7 +625,13 @@ class GitHubWorkflowRunner:
                 )
 
             if protection and self.disableProtections:
-                logger.warning("Removing branch protection, wait until they are restored.")
+                if self._cicd.branchName != self._cicd.defaultBranchName:
+                    logger.warning("Removing branch protection, wait until it's restored.")
+                else:
+                    # no need to restore branch protection if we are working with the default
+                    # nord-stream branch
+                    logger.warning("Removing branch protection.")
+
                 self._cicd.disableBranchProtectionRules(repo)
                 return protection
 
@@ -648,85 +660,53 @@ class GitHubWorkflowRunner:
             logger.info(f'No branch protection rule found on "{self._cicd.branchName}" branch')
         return False, None
 
-    def checkBranchProtections(self):
-        for repo in self._cicd.repos:
-            logger.info(f'Checking security: "{repo}"')
-            # TODO: check branch wide protection
-            # For now, it's not available in the REST API. It could still be performed using the GraphQL API.
-            # https://github.com/github/safe-settings/issues/311
-            protectionEnabled = False
-
-            url = f"https://foo:{self._cicd.token}@github.com/{repo}"
-            Git.gitClone(url)
-
-            repoShortName = repo.split("/")[1]
-            chdir(repoShortName)
-            self._pushedCommitsCount = 0
-            self._branchAlreadyExists = Git.gitRemoteBranchExists(self._cicd.branchName)
-            Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
-
-            try:
-                protectionEnabled, protection = self.__checkAndGetBranchProtectionRules(repo)
-
-                if protectionEnabled:
-                    if protection:
-                        displayBranchProtectionRules(protection)
-                    else:
-                        logger.info(
-                            "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
-                        )
-
-                self.__checkAllEnvSecurity(repo)
-
-            except Exception:
-                pass
-            finally:
-                self.__clean(repo)
-                chdir("../")
-                subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
-
-    def __checkAndDisableEnvProtections(self, repo, env):
+    def __isEnvProtectionsEnabled(self, repo, env):
         envDetails = self._cicd.getEnvDetails(repo, env)
+        protectionRules = envDetails.get("protection_rules")
+
+        if len(protectionRules) > 0:
+            displayEnvSecurity(envDetails)
+            return envDetails
+
+        else:
+            logger.verbose("No environment protection rule found")
+            return False
+
+        return policyId, waitTime, reviewers, branchPolicy
+
+    def __disableEnvProtections(self, repo, envDetails):
         protectionRules = envDetails.get("protection_rules")
         branchPolicy = envDetails.get("deployment_branch_policy")
         waitTime = 0
         reviewers = []
         policyId = None
+        env = envDetails.get("name")
 
-        if len(protectionRules) > 0 and self._disableProtections:
-            displayEnvSecurity(envDetails)
+        try:
+            logger.warning("Modifying env protection, wait until it's restored.")
+            if branchPolicy and branchPolicy.get("custom_branch_policies", False):
+                policyId = self._cicd.createDeploymentBranchPolicy(repo, env)
 
-            try:
-                logger.warning("Modifying env protection, wait until they are restored.")
-                if branchPolicy and branchPolicy.get("custom_branch_policies", False):
-                    policyId = self._cicd.createDeploymentBranchPolicy(repo, env)
+            for protection in protectionRules:
+                if protection.get("type") == "required_reviewers":
+                    for reviewer in protection.get("reviewers"):
+                        reviewers.append(
+                            {
+                                "type": reviewer.get("type"),
+                                "id": reviewer.get("reviewer").get("id"),
+                            }
+                        )
+                if protection.get("type") == "wait_timer":
+                    waitTime = protection.get("wait_timer")
 
-                for protection in protectionRules:
-                    if protection.get("type") == "required_reviewers":
-                        for reviewer in protection.get("reviewers"):
-                            reviewers.append(
-                                {
-                                    "type": reviewer.get("type"),
-                                    "id": reviewer.get("reviewer").get("id"),
-                                }
-                            )
-                    if protection.get("type") == "wait_timer":
-                        waitTime = protection.get("wait_timer")
-
-                self._cicd.modifyEnvProtectionRules(repo, env, 0, [], branchPolicy)
-            except GitHubError:
-                raise Exception("Environment protection rule enabled but not enough privileges to disable it.")
-
-        elif len(protectionRules) > 0 and not self._disableProtections:
-            displayEnvSecurity(envDetails)
-            raise Exception("Environment protection rule enabled but '--disable-protections' not activated")
-        else:
-            logger.verbose("No environment protection rule found")
+            self._cicd.modifyEnvProtectionRules(repo, env, 0, [], branchPolicy)
+        except GitHubError:
+            raise Exception("Environment protection rule enabled but not enough privileges to disable it.")
 
         return policyId, waitTime, reviewers, branchPolicy
 
     def __restoreEnvProtections(self, repo, env, policyId, waitTime, reviewers, branchPolicy):
-        logger.warning("Restoring protections.")
+        logger.warning("Restoring env protections.")
         if policyId is not None:
             self._cicd.deleteDeploymentBranchPolicy(repo, env)
         self._cicd.modifyEnvProtectionRules(repo, env, waitTime, reviewers, branchPolicy)
@@ -760,7 +740,7 @@ class GitHubWorkflowRunner:
 
     def __resetBranchProtectionRules(self, repo, protections):
 
-        logger.warning("Restoring protection.")
+        logger.warning("Restoring branch protection.")
 
         data = {}
 
