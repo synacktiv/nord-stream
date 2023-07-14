@@ -463,7 +463,7 @@ class GitHubWorkflowRunner:
         workflowGenerator.loadFile(self._yaml)
 
         if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "custom", self._env):
-            self.__extractSensitiveInformationFromWorkflowResult(repo)
+            self.__getWorkflowOutput(repo)
 
         logger.empty_line()
 
