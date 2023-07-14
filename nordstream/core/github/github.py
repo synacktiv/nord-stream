@@ -697,7 +697,7 @@ class GitHubWorkflowRunner:
             displayEnvSecurity(envDetails)
 
             try:
-                logger.info("Modifying protections")
+                logger.warning("Modifying env protection, wait until they are restored.")
                 if branchPolicy and branchPolicy.get("custom_branch_policies", False):
                     policyId = self._cicd.createDeploymentBranchPolicy(repo, env)
 
@@ -726,7 +726,7 @@ class GitHubWorkflowRunner:
         return policyId, waitTime, reviewers, branchPolicy
 
     def __restoreEnvProtections(self, repo, env, policyId, waitTime, reviewers, branchPolicy):
-        logger.info("Restoring protections")
+        logger.warning("Restoring protections.")
         if policyId is not None:
             self._cicd.deleteDeploymentBranchPolicy(repo, env)
         self._cicd.modifyEnvProtectionRules(repo, env, waitTime, reviewers, branchPolicy)
