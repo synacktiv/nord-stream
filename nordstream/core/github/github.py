@@ -585,6 +585,43 @@ class GitHubWorkflowRunner:
         envDetails = self._cicd.getEnvDetails(repo, env)
         displayEnvSecurity(envDetails)
 
+    def checkBranchProtections(self):
+        for repo in self._cicd.repos:
+            logger.info(f'Checking security: "{repo}"')
+            # TODO: check branch wide protection
+            # For now, it's not available in the REST API. It could still be performed using the GraphQL API.
+            # https://github.com/github/safe-settings/issues/311
+            protectionEnabled = False
+
+            url = f"https://foo:{self._cicd.token}@github.com/{repo}"
+            Git.gitClone(url)
+
+            repoShortName = repo.split("/")[1]
+            chdir(repoShortName)
+            self._pushedCommitsCount = 0
+            self._branchAlreadyExists = Git.gitRemoteBranchExists(self._cicd.branchName)
+            Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
+
+            try:
+                protectionEnabled, protection = self.__checkAndGetBranchProtectionRules(repo)
+
+                if protectionEnabled:
+                    if protection:
+                        displayBranchProtectionRules(protection)
+                    else:
+                        logger.info(
+                            "Not enough privileges to get protection rules or 'Restrict pushes that create matching branches' is enabled. Check another branch."
+                        )
+
+                self.__checkAllEnvSecurity(repo)
+
+            except Exception:
+                pass
+            finally:
+                self.__clean(repo)
+                chdir("../")
+                subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
+
     def _checkBranchProtectionRules(self, repo):
         protectionEnabled = False
 
