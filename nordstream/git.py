@@ -5,9 +5,6 @@ from nordstream.utils.log import logger
 TODO: find an alternative to subprocess it's a bit crappy.
 """
 
-ATTACK_COMMIT_MSG = "Test deployment"
-CLEAN_COMMIT_MSG = "Remove test deployment"
-
 
 class Git:
 

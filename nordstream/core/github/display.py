@@ -50,7 +50,7 @@ def displayEnvSecurity(envDetails):
                 else:
                     logger.raw(f"\t- deployment branch policy: protected\n", logging.INFO)
     else:
-        logger.info("No environment protection rule found")
+        logger.info(f'No environment protection rule found for: "{envName}"')
 
 
 def displayBranchProtectionRules(protections):
