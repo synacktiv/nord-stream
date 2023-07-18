@@ -89,9 +89,9 @@ def start(argv):
     devopsRunner = DevOpsRunner(devops)
 
     if args["--key-id"]:
-        git.KEY_ID = args["--key-id"]
-        git.USER = args["--user"]
-        git.EMAIL = args["--email"]
+        Git.KEY_ID = args["--key-id"]
+        Git.USER = args["--user"]
+        Git.EMAIL = args["--email"]
 
     if args["--yaml"]:
         devopsRunner.yaml = args["--yaml"]

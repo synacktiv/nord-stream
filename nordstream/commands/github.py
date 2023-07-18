@@ -6,7 +6,7 @@ Usage:
     nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
     nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
-    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-subscription-id <subscription> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
@@ -94,9 +94,9 @@ def start(argv):
         logger.info(f'Using branch: "{gitHub.branchName}"')
 
     if args["--key-id"]:
-        git.KEY_ID = args["--key-id"]
-        git.USER = args["--user"]
-        git.EMAIL = args["--email"]
+        Git.KEY_ID = args["--key-id"]
+        Git.USER = args["--user"]
+        Git.EMAIL = args["--email"]
 
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])
