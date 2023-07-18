@@ -580,6 +580,7 @@ class DevOpsRunner:
                     Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
                 else:
                     if not self.__deleteRemoteBranch():
+                        logger.info("Cleaning remote branch.")
                         # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                         Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 

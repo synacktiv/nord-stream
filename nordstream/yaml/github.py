@@ -58,7 +58,7 @@ class WorkflowGenerator(YamlGeneratorBase):
                         "with": {"role-to-assume": None, "role-session-name": "oidcrolesession", "aws-region": None},
                     },
                     {
-                        "name": "commands",
+                        "name": "command",
                         "run": "sh -c 'env | grep \"^AWS_\" | base64 -w0 | base64 -w0'",
                     },
                 ],
