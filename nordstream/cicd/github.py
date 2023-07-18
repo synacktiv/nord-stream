@@ -365,7 +365,8 @@ class GitHub:
             commit = self._session.get(
                 f"{self._repoURL}/{repo}/commits/{deployment['sha']}", auth=self._auth, headers=self._header
             ).json()
-            if commit["commit"]["message"] != Git.ATTACK_COMMIT_MSG:
+
+            if commit["commit"]["message"] != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
                 continue
 
             deploymentId = deployment.get("id")

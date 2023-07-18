@@ -536,7 +536,7 @@ class DevOps:
                 buildSource = self.__getBuildSources(projectId, buildId)
 
                 if (
-                    buildSource.get("comment") == Git.ATTACK_COMMIT_MSG
+                    buildSource.get("comment") == (Git.ATTACK_COMMIT_MSG or Git.CLEAN_COMMIT_MSG)
                     and buildSource.get("author").get("email") == Git.EMAIL
                 ):
                     return buildId

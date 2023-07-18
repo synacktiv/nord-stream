@@ -370,7 +370,7 @@ class GitLab:
                     verify=self._verifyCert,
                 ).json()
 
-                if response.get("title") != Git.ATTACK_COMMIT_MSG:
+                if response.get("title") != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
                     continue
 
                 if response.get("author_name") != Git.LOCAL_USERNAME:
