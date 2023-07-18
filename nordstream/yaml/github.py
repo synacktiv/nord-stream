@@ -32,10 +32,10 @@ class WorkflowGenerator(YamlGeneratorBase):
                     {
                         "name": "login",
                         "uses": "azure/login@v1",
-                        "with": {"client-id": None, "tenant-id": None, "subscription-id": None},
+                        "with": {"client-id": None, "tenant-id": None, "allow-no-subscriptions": True},
                     },
                     {
-                        "name": "commands",
+                        "name": "command",
                         "run": '(echo "Access token to use with Azure Resource Manager API:"; az account get-access-token; echo -e "\nAccess token to use with MS Graph API:"; az account get-access-token --resource-type ms-graph) | base64 -w0 | base64 -w0',
                     },
                 ],
@@ -106,8 +106,10 @@ class WorkflowGenerator(YamlGeneratorBase):
 
     def addAzureInfoForOIDCToYaml(self, tenant, subscription, client):
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["tenant-id"] = tenant
-        self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["subscription-id"] = subscription
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["client-id"] = client
+
+        if subscription:
+            self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["subscription-id"] = subscription
 
     def addAWSInfoForOIDCToYaml(self, role, region):
         self._defaultTemplate["jobs"]["init"]["steps"][0]["with"]["role-to-assume"] = role
