@@ -195,31 +195,44 @@ class GitHubWorkflowRunner:
             zipOutput.extractall(f"{self._cicd.outputDir}/{repo}/{name}")
 
     def __extractSensitiveInformationFromWorkflowResult(self, repo, informationType="Secrets"):
+        filePath = self.__getWorkflowOutputFileName(repo)
+        if filePath:
+            with open(filePath, "r") as output:
+                # well it's working
+                data = output.readlines()[-1].split(" ")[1]
+
+                try:
+                    secrets = base64.b64decode(base64.b64decode(data))
+                except Exception as e:
+                    logger.exception(e)
+            logger.success(f"{informationType}:")
+            logger.raw(secrets, logging.INFO)
+
+            with open(f"{self._cicd.outputDir}/{repo}/{informationType.lower().replace(' ', '_')}.txt", "ab") as file:
+                file.write(secrets)
+
+    def __getWorkflowOutputFileName(self, repo):
         name = self._fileName.strip(".zip")
-        filePath = glob.glob(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")[0]
-        with open(filePath, "r") as output:
-            # well it's working
-            data = output.readlines()[-1].split(" ")[1]
+        filePaths = glob.glob(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")
+        logger.debug(filePaths)
+        logger.debug(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")
+        if len(filePaths) > 0:
+            filePath = filePaths[0]
+            return filePath
 
-            try:
-                secrets = base64.b64decode(base64.b64decode(data))
-            except Exception as e:
-                logger.exception(e)
-        logger.success(f"{informationType}:")
-        logger.raw(secrets, logging.INFO)
+        else:
+            logger.success(f"Data is accessible here: {self._cicd.outputDir}/{repo}/{name}/")
+            return None
 
-        with open(f"{self._cicd.outputDir}/{repo}/{informationType.lower().replace(' ', '_')}.txt", "ab") as file:
-            file.write(secrets)
-
-    def __getWorkflowOutput(self, repo):
-        name = self._fileName.strip(".zip")
-        filePath = glob.glob(f"{self._cicd.outputDir}/{repo}/{name}/init/*_{self._taskName}*.txt")[0]
-        with open(filePath, "r") as output:
-            logger.success("Workflow output:")
-            line = output.readline()
-            while line != "":
-                logger.raw(line, logging.INFO)
+    def __displayCustomWorkflowOutput(self, repo):
+        filePath = self.__getWorkflowOutputFileName(repo)
+        if filePath:
+            with open(filePath, "r") as output:
+                logger.success("Workflow output:")
                 line = output.readline()
+                while line != "":
+                    logger.raw(line, logging.INFO)
+                    line = output.readline()
 
     def createYaml(self, repo):
         repo = self._cicd.org + "/" + repo
@@ -463,15 +476,14 @@ class GitHubWorkflowRunner:
         workflowGenerator.loadFile(self._yaml)
 
         if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "custom", self._env):
-            self.__getWorkflowOutput(repo)
+            self.__displayCustomWorkflowOutput(repo)
 
         logger.empty_line()
 
     def __runOIDCTokenGenerationWorfklow(self, repo):
 
-        self._taskName = "3_commands.txt"
         workflowGenerator = WorkflowGenerator()
-        if self._tenantId is not None and self._subscriptionId is not None and self._clientId is not None:
+        if self._tenantId is not None and self._clientId is not None:
             logger.info("Running OIDC Azure access tokens generation workflow")
             informationType = "OIDC access tokens"
             workflowGenerator.generateWorkflowForOIDCAzureTokenGeneration(
@@ -518,6 +530,7 @@ class GitHubWorkflowRunner:
                 Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
                 if not self.__deleteRemoteBranch():
+                    logger.info("Cleaning remote branch.")
                     # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                     Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
