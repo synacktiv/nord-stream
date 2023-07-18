@@ -163,4 +163,4 @@ def start(argv):
     else:
         gitHubWorkflowRunner.writeAccessFilter = True
         gitHubWorkflowRunner.getRepos(args["--repo"])
-        gitHubWorkflowRunner.runWorkflow()
+        gitHubWorkflowRunner.start()
