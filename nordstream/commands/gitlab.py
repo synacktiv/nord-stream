@@ -45,6 +45,8 @@ Examples:
 
     Deploy the custom pipeline on the master branch
     $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master
+
+Authors: @hugow @0hexit
 """
 
 from docopt import docopt
