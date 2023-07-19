@@ -324,7 +324,7 @@ steps:
     with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }} # this can be optional
 ```
 
 If you come across such a workflow, this means that the repository might be configured to get a short-lived access token that can give you access to Azure resources.
@@ -361,6 +361,8 @@ Access token to use with MS Graph API:
   "tokenType": "Bearer"
 }
 ```
+
+The `--azure-subscription-id` is optional and can be used to get an access token for a specific subscription.
 
 #### AWS OIDC
 
