@@ -9,6 +9,14 @@ from typing import Any, cast
 from rich.console import Console
 from rich.logging import RichHandler
 
+# Blablabla "roll your own logging handler"
+# https://github.com/Textualize/rich/issues/2647#issuecomment-1335017733
+class WhitespaceStrippingConsole(Console):
+    def _render_buffer(self, *args, **kwargs):
+        rendered = super()._render_buffer(*args, **kwargs)
+        newline_char = "\n" if rendered[-1] == "\n" else ""
+        return "\n".join(line.rstrip() for line in rendered.splitlines()) + newline_char
+
 
 class NordStreamLog(logging.Logger):
     # New logging level
@@ -92,7 +100,7 @@ class NordStreamLog(logging.Logger):
 
 
 # Global rich console object
-console: Console = Console()
+console: Console = WhitespaceStrippingConsole()
 
 # Main logging default config
 # Set default Logger class as NordStreamLog
