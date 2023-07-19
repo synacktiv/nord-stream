@@ -131,7 +131,7 @@ $ cat nord-stream-logs/github/synacktiv/TestCICD/workflow_custom_2023-07-18_22-0
 
 #### Clean logs
 
-By default, the Nord Stream will attempt to remove traces left after a pipeline deployment, depending on your privileges. To preserve traces, the `--no-clean` option can be used. This will keep the pipeline logs, but this will still revert the changes made to the repository.
+By default, Nord Stream will attempt to remove traces left after a pipeline deployment, depending on your privileges. To preserve traces, the `--no-clean` option can be used. This will keep the pipeline logs, but this will still revert the changes made to the repository.
 Note that for GitLab, some traces cannot be deleted.
 
 
@@ -143,7 +143,7 @@ First create an import your GPG key on the SCM platform.
 ```sh
 $ gpg --full-generate-key
 $ gpg --armor --export F94496913C43EFC5
-gpg --list-secret-keys --keyid-format=long
+$ gpg --list-secret-keys --keyid-format=long
 sec   dsa2048/F94496913C43EFC5 2023-07-18 [SC] [expires: 2023-07-23]
       Key fingerprint = B158 3F43 9899 C5A3 B74E  D04B F944 9691 3C43 EFC5
 uid                 [ultimate] test-gpg <test.gpg@cicd.local>
@@ -163,7 +163,7 @@ secret_PROD_SECRET=my PROD_SECRET
 ```
 
 ```bash
-git verify-commit 00dcd856624bc9a41f8bd70662f0650839730973
+$ git verify-commit 00dcd856624bc9a41f8bd70662f0650839730973
 gpg: Signature made Tue 18 Jul 2023 10:34:18 PM CEST
 gpg:                using DSA key B1583F439899C5A3B74ED04BF94496913C43EFC5
 gpg: Good signature from "test-gpg <test.gpg@cicd.local>" [ultimate]
