@@ -93,7 +93,7 @@ class GitHub:
             params = {"page": page}
 
             if self._isGHSToken:
-                url = (f"https://api.github.com/orgs/{self._org}/repos",)
+                url = f"https://api.github.com/orgs/{self._org}/repos"
             else:
                 url = f"https://api.github.com/user/repos"
 
