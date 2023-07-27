@@ -78,11 +78,11 @@ class GitHub:
         self._outputDir = value
 
     def __getLogin(self):
-        return self.getUser().get("login")
+        return self.getUser().json().get("login")
 
     def getUser(self):
         logger.debug("Retrieving user informations")
-        return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header).json()
+        return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header)
 
     def listRepos(self):
         logger.debug("Listing repos")

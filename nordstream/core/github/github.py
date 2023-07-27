@@ -763,6 +763,9 @@ class GitHubWorkflowRunner:
 
     def describeToken(self):
         response = self._cicd.getUser()
+        headers = response.headers
+        response = response.json()
+
         logger.info("Token information:")
 
         login = response.get("login")
@@ -770,7 +773,8 @@ class GitHubWorkflowRunner:
             logger.raw(f"\t- Login: {login}\n", logging.INFO)
 
         isAdmin = response.get("site_admin")
-        logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+        if isAdmin != None:
+            logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
 
         email = response.get("email")
         if email != None:
@@ -781,12 +785,20 @@ class GitHubWorkflowRunner:
             logger.raw(f"\t- Id: {id}\n", logging.INFO)
 
         bio = response.get("bio")
-        if bio != "":
+        if bio != None:
             logger.raw(f"\t- Bio: {bio}\n", logging.INFO)
 
         company = response.get("company")
         if company != None:
             logger.raw(f"\t- Company: {company}\n", logging.INFO)
+
+        tokenScopes = headers.get("x-oauth-scopes")
+        if tokenScopes != None:
+            scopes = tokenScopes.split(", ")
+            if len(scopes) != 0:
+                logger.raw(f"\t- Token scopes:\n", logging.INFO)
+                for scope in scopes:
+                    logger.raw(f"\t    - {scope}\n", logging.INFO)
 
     def __resetBranchProtectionRules(self, repo, protections):
 
