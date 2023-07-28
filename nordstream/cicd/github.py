@@ -84,18 +84,13 @@ class GitHub:
         logger.debug("Retrieving user informations")
         return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header)
 
-    def listRepos(self):
-        logger.debug("Listing repos")
+    def __paginatedGet(self, url, data=""):
+
         page = 1
-        # Github pagination
+        res = []
         while True:
 
             params = {"page": page}
-
-            if self._isGHSToken:
-                url = f"https://api.github.com/orgs/{self._org}/repos"
-            else:
-                url = f"https://api.github.com/user/repos"
 
             response = self._session.get(
                 url,
@@ -103,17 +98,42 @@ class GitHub:
                 auth=self._auth,
                 headers=self._header,
             ).json()
-            if len(response) != 0:
-                for repo in response:
-                    # filter for specific org
-                    if self._org:
-                        if self._org.lower() == repo.get("owner").get("login").lower():
-                            self._repos.append(repo.get("full_name"))
-                    else:
-                        self._repos.append(repo.get("full_name"))
-                page += 1
-            else:
+
+            if not isinstance(response, list) and response.get("message", None):
+                if response.get("message") != "Not Found":
+                    raise GitHubError(response.get("message"))
+                return res
+
+            if (data != "" and len(response.get(data)) == 0) or (data == "" and len(response) == 0):
                 break
+
+            if data != "" and len(response.get(data)) != 0:
+                res.extend(response.get(data, []))
+
+            if data == "" and len(response) != 0:
+                res.extend(response)
+
+            page += 1
+
+        return res
+
+    def listRepos(self):
+        logger.debug("Listing repos")
+
+        if self._isGHSToken:
+            url = f"https://api.github.com/orgs/{self._org}/repos"
+        else:
+            url = f"https://api.github.com/user/repos"
+
+        response = self.__paginatedGet(url)
+
+        for repo in response:
+            # filter for specific org
+            if self._org:
+                if self._org.lower() == repo.get("owner").get("login").lower():
+                    self._repos.append(repo.get("full_name"))
+            else:
+                self._repos.append(repo.get("full_name"))
 
     def addRepo(self, repo):
         logger.debug(f"Checking repo: {repo}")
@@ -139,64 +159,42 @@ class GitHub:
     def listEnvFromrepo(self, repo):
         logger.debug(f"Listing environment secret from repo: {repo}")
         res = []
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/environments",
-            auth=self._auth,
-            headers=self._header,
-        ).json()
-        if response.get("total_count", 0) > 0:
-            for env in response.get("environments"):
-                res.append(env.get("name"))
+        response = self.__paginatedGet(f"{self._repoURL}/{repo}/environments", data="environments")
+
+        for env in response:
+            res.append(env.get("name"))
         return res
 
     def listSecretsFromEnv(self, repo, env):
         logger.debug(f"Getting environment secrets for {repo}: {env}")
         envReq = urllib.parse.quote(env, safe="")
         res = []
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/environments/{envReq}/secrets",
-            auth=self._auth,
-            headers=self._header,
-        ).json()
 
-        if response.get("total_count", 0) >= 0:
-            for sec in response.get("secrets") or []:
-                res.append(sec.get("name"))
-        else:
-            raise GitHubError(response.get("message"))
+        response = self.__paginatedGet(f"{self._repoURL}/{repo}/environments/{envReq}/secrets", data="secrets")
+
+        for sec in response:
+            res.append(sec.get("name"))
+
         return res
 
     def listSecretsFromRepo(self, repo):
         res = []
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/actions/secrets",
-            auth=self._auth,
-            headers=self._header,
-        ).json()
 
-        if response.get("total_count") != None and response.get("total_count") >= 0:
-            for sec in response.get("secrets") or []:
-                res.append(sec.get("name"))
-        else:
+        response = self.__paginatedGet(f"{self._repoURL}/{repo}/actions/secrets", data="secrets")
 
-            # I already saw "Resource not accessible by integration" and token had write access
-            if response.get("message") == "Not Found":
-                raise GitHubError(response.get("message"))
+        for sec in response:
+            res.append(sec.get("name"))
+
         return res
 
     def listOrganizationSecretsFromRepo(self, repo):
         res = []
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/actions/organization-secrets",
-            auth=self._auth,
-            headers=self._header,
-        ).json()
 
-        if response.get("total_count", 0) >= 0:
-            for sec in response.get("secrets") or []:
-                res.append(sec.get("name"))
-        else:
-            raise GitHubError(response.get("message"))
+        response = self.__paginatedGet(f"{self._repoURL}/{repo}/actions/organization-secrets", data="secrets")
+
+        for sec in response:
+            res.append(sec.get("name"))
+
         return res
 
     def listEnvProtections(self, repo, env):
@@ -355,9 +353,8 @@ class GitHub:
     def cleanDeploymentsLogs(self, repo):
         logger.verbose(f"Cleaning deployment logs from: {repo}")
         url = f"{self._repoURL}/{repo}/deployments?ref={self._branchName}"
-        response = self._session.get(url, auth=self._auth, headers=self._header).json()
+        response = self.__paginatedGet(url)
 
-        # TODO: might be a good idea to check all deployments with pagination
         for deployment in response:
             if not self._isGHSToken and deployment.get("creator").get("login").lower() != self._githubLogin.lower():
                 continue
@@ -386,11 +383,28 @@ class GitHub:
     def cleanRunLogs(self, repo, workflowFilename):
         logger.verbose(f"Cleaning run logs from: {repo}")
         url = f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={self._branchName}"
-        response = self._session.get(url, auth=self._auth, headers=self._header).json()
+        response = self.__paginatedGet(url, data="workflow_runs")
 
-        if response.get("total_count", 0) != 0:
-            for run in response.get("workflow_runs"):
-                runId = run.get("id")
+        for run in response:
+            runId = run.get("id")
+            status = (
+                self._session.get(
+                    f"{self._repoURL}/{repo}/actions/runs/{runId}",
+                    json={},
+                    auth=self._auth,
+                    headers=self._header,
+                )
+                .json()
+                .get("status")
+            )
+
+            if status != "completed":
+                self._session.post(
+                    f"{self._repoURL}/{repo}/actions/runs/{runId}/cancel",
+                    json={},
+                    auth=self._auth,
+                    headers=self._header,
+                )
                 status = (
                     self._session.get(
                         f"{self._repoURL}/{repo}/actions/runs/{runId}",
@@ -401,50 +415,32 @@ class GitHub:
                     .json()
                     .get("status")
                 )
-
                 if status != "completed":
-                    self._session.post(
-                        f"{self._repoURL}/{repo}/actions/runs/{runId}/cancel",
-                        json={},
-                        auth=self._auth,
-                        headers=self._header,
-                    )
-                    status = (
-                        self._session.get(
-                            f"{self._repoURL}/{repo}/actions/runs/{runId}",
-                            json={},
-                            auth=self._auth,
-                            headers=self._header,
-                        )
-                        .json()
-                        .get("status")
-                    )
-                    if status != "completed":
-                        for i in range(self._maxRetry):
-                            time.sleep(2)
-                            status = (
-                                self._session.get(
-                                    f"{self._repoURL}/{repo}/actions/runs/{runId}",
-                                    json={},
-                                    auth=self._auth,
-                                    headers=self._header,
-                                )
-                                .json()
-                                .get("status")
+                    for i in range(self._maxRetry):
+                        time.sleep(2)
+                        status = (
+                            self._session.get(
+                                f"{self._repoURL}/{repo}/actions/runs/{runId}",
+                                json={},
+                                auth=self._auth,
+                                headers=self._header,
                             )
-                            if status == "completed":
-                                break
+                            .json()
+                            .get("status")
+                        )
+                        if status == "completed":
+                            break
 
-                self._session.delete(
-                    f"{self._repoURL}/{repo}/actions/runs/{runId}/logs",
-                    auth=self._auth,
-                    headers=self._header,
-                )
-                self._session.delete(
-                    f"{self._repoURL}/{repo}/actions/runs/{runId}",
-                    auth=self._auth,
-                    headers=self._header,
-                )
+            self._session.delete(
+                f"{self._repoURL}/{repo}/actions/runs/{runId}/logs",
+                auth=self._auth,
+                headers=self._header,
+            )
+            self._session.delete(
+                f"{self._repoURL}/{repo}/actions/runs/{runId}",
+                auth=self._auth,
+                headers=self._header,
+            )
 
     def cleanAllLogs(self, repo, workflowFilename):
         logger.debug(f"Cleaning logs for: {repo}")
