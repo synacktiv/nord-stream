@@ -172,11 +172,10 @@ class GitLabRunner:
 
     def __displayGroupVariables(self, group):
 
-        groupPath = group.get("full_path")()
+        groupPath = group.get("full_path")
 
         try:
             variables = self._cicd.listVariablesFromGroup(group)
-
             if len(variables) != 0:
                 logger.info(f'"{groupPath}" group variables:')
 
