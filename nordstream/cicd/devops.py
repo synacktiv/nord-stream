@@ -135,7 +135,10 @@ class DevOps:
                 auth=self._auth,
                 headers=self._header,
                 verify=self._verifyCert,
-            ).json()
+            )
+
+            headers = response.headers
+            response = response.json()
 
             if len(response.get("value")) != 0:
                 for project in self._projects:
@@ -149,7 +152,7 @@ class DevOps:
                             if not duplicate:
                                 res.append(project)
 
-                continuationToken += response.get("continuationToken")
+                continuationToken = headers.get("x-ms-continuationtoken", None)
                 if not continuationToken:
                     break
 
