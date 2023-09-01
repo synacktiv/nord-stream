@@ -67,17 +67,30 @@ class GitLab:
     def branchName(self, value):
         self._branchName = value
 
+    @property
+    def verifyCert(self):
+        return self._verifyCert
+
+    @verifyCert.setter
+    def verifyCert(self, value):
+        self._verifyCert = value
+
     @classmethod
-    def checkToken(cls, token, gitlabURL):
+    def checkToken(cls, token, gitlabURL, verifyCert):
         logger.verbose(f"Checking token: {token}")
         # from https://docs.gitlab.com/ee/api/rest/index.html#personalprojectgroup-access-tokens
-        return (
-            requests.get(
-                f"{gitlabURL.strip('/')}/api/v4/user",
-                headers={"PRIVATE-TOKEN": token},
-            ).status_code
-            == 200
-        )
+        try:
+            return (
+                requests.get(
+                    f"{gitlabURL.strip('/')}/api/v4/user",
+                    headers={"PRIVATE-TOKEN": token},
+                    verify=verifyCert,
+                ).status_code
+                == 200
+            )
+        except Exception as e:
+            logger.error(e)
+        return False
 
     def __getLogin(self):
         response = self.getUser()

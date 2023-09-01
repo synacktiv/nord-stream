@@ -15,6 +15,7 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
+    --ignore-cert                           Allow insecure server connections
 
 Signing:
     --key-id <id>                           GPG primary key ID
@@ -67,13 +68,15 @@ def start(argv):
     logger.debug(args)
 
     # check validity of the token
-    if not GitLab.checkToken(args["--token"], args["--url"]):
+    if not GitLab.checkToken(args["--token"], args["--url"], (not args["--ignore-cert"])):
         logger.critical("Invalid token")
 
     # gitlab setup
     gitlab = GitLab(args["--url"], args["--token"])
     if args["--output-dir"]:
         gitlab.outputDir = args["--output-dir"] + "/"
+
+    gitlab.verifyCert = not args["--ignore-cert"]
     gitLabRunner = GitLabRunner(gitlab)
 
     if args["--key-id"]:
