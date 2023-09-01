@@ -95,7 +95,7 @@ class GitLab:
 
     def getUser(self):
         logger.debug(f"Retrieving user informations")
-        logger.debug(self._verifyCert)
+
         return self._session.get(
             f"{self._gitlabURL}/api/v4/user",
             headers=self._header,
