@@ -72,11 +72,9 @@ def start(argv):
         logger.critical("Invalid token")
 
     # gitlab setup
-    gitlab = GitLab(args["--url"], args["--token"])
+    gitlab = GitLab(args["--url"], args["--token"], (not args["--ignore-cert"]))
     if args["--output-dir"]:
         gitlab.outputDir = args["--output-dir"] + "/"
-
-    gitlab.verifyCert = not args["--ignore-cert"]
     gitLabRunner = GitLabRunner(gitlab)
 
     if args["--key-id"]:

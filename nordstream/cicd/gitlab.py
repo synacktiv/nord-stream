@@ -4,8 +4,12 @@ from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
+import urllib3
 
 COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
+
+# painfull warnings you know what you are doing right ?
+requests.packages.urllib3.disable_warnings()
 
 
 class GitLab:
@@ -23,10 +27,11 @@ class GitLab:
     _sleepTime = 15
     _maxRetry = 10
 
-    def __init__(self, url, token):
+    def __init__(self, url, token, verifCert):
         self._gitlabURL = url.strip("/")
         self._token = token
         self._header = {"PRIVATE-TOKEN": token}
+        self._verifyCert = verifCert
         self._session = requests.Session()
         self._gitlabLogin = self.__getLogin()
         # self._session.headers.update({"PRIVATE-TOKEN": token})
@@ -67,14 +72,6 @@ class GitLab:
     def branchName(self, value):
         self._branchName = value
 
-    @property
-    def verifyCert(self):
-        return self._verifyCert
-
-    @verifyCert.setter
-    def verifyCert(self, value):
-        self._verifyCert = value
-
     @classmethod
     def checkToken(cls, token, gitlabURL, verifyCert):
         logger.verbose(f"Checking token: {token}")
@@ -98,6 +95,7 @@ class GitLab:
 
     def getUser(self):
         logger.debug(f"Retrieving user informations")
+        logger.debug(self._verifyCert)
         return self._session.get(
             f"{self._gitlabURL}/api/v4/user",
             headers=self._header,
