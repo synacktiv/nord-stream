@@ -222,7 +222,12 @@ class GitLabRunner:
             logger.success(f'"{repoShortName}"')
 
             domain = urlparse(self._cicd.url).netloc
-            url = f"https://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
+            if self._cicd.url.startswith("https"):
+                handler = "https"
+            else:
+                handler = "http"
+
+            url = f"{handler}://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
             Git.gitClone(url)
 
             chdir(repoShortName)
