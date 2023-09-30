@@ -63,7 +63,7 @@ class NordStreamLog(logging.Logger):
             if type(msg) is bytes:
                 msg = msg.decode("utf-8", errors="ignore")
             # Raw message are print directly to the console bypassing logging system and auto formatting
-            console.print(msg, end="", markup=markup, highlight=highlight, emoji=emoji)
+            console.print(msg, end="", markup=markup, highlight=highlight, emoji=emoji, soft_wrap=True)
 
     def info(self, msg: Any, *args: Any, **kwargs: Any) -> None:
         """Change default info text format with rich color support"""

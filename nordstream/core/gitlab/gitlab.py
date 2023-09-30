@@ -338,13 +338,8 @@ class GitLabRunner:
             f"{self._cicd.outputDir}/{projectPath}/{self._fileName}",
             "rb",
         ) as output:
-            try:
 
-                pipelineResults = output.read()
-
-            except:
-                output.seek(0)
-                pipelineResults = output.read()
+            pipelineResults = output.read()
 
         logger.success("Output:")
         logger.raw(pipelineResults, logging.INFO)
