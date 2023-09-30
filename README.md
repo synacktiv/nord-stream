@@ -497,7 +497,7 @@ deploy-production:
 Same as [YAML](#yaml), however you need to provide the full project path like this:
 
 ```sh
-$ nord-stream.py gitlab --token "$PAT" --url https://gitlab.corp.local --project 'group/projectname' --yaml /tmp/ci.yml
+$ nord-stream.py gitlab --token "$PAT" --url https://gitlab.corp.local --project 'group/projectname' --yaml ci.yml
 ```
 
 The output of the command `--list-projects` returns such path.
