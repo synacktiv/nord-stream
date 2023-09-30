@@ -554,7 +554,7 @@ Examples:
     $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
 
     Deploy the custom pipeline on the master branch
-    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master
+    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
 
 Authors: @hugow @0hexit
 ```
