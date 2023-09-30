@@ -207,7 +207,14 @@ class GitLabRunner:
     def listGitLabProjects(self):
         logger.info("Listing GitLab projects")
         for project in self._cicd.projects:
-            logger.raw(f'- {project["path_with_namespace"]}\n', level=logging.INFO)
+
+            repoPath = project.get("path")
+            repoName = project.get("name")
+
+            if repoPath != repoName:
+                logger.raw(f'- {project["path_with_namespace"]} ({repoName})\n', level=logging.INFO)
+            else:
+                logger.raw(f'- {project["path_with_namespace"]}\n', level=logging.INFO)
 
     def listGitLabGroups(self):
         logger.info("Listing GitLab groups")
@@ -217,9 +224,13 @@ class GitLabRunner:
     def runPipeline(self):
         for project in self._cicd.projects:
 
-            repoShortName = project.get("name")
+            repoPath = project.get("path")
+            repoName = project.get("name")
 
-            logger.success(f'"{repoShortName}"')
+            if repoPath != repoName:
+                logger.success(f'"{repoName}" ({repoPath})')
+            else:
+                logger.success(f'"{repoName}"')
 
             domain = urlparse(self._cicd.url).netloc
             if self._cicd.url.startswith("https"):
@@ -230,7 +241,7 @@ class GitLabRunner:
             url = f"{handler}://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
             Git.gitClone(url)
 
-            chdir(repoShortName)
+            chdir(repoPath)
             self._pushedCommitsCount = 0
             self._branchAlreadyExists = Git.gitRemoteBranchExists(self._cicd.branchName)
             Git.gitInitialization(self._cicd.branchName, branchAlreadyExists=self._branchAlreadyExists)
@@ -256,7 +267,7 @@ class GitLabRunner:
             finally:
                 self.__clean(project)
                 chdir("../")
-                subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
+                subprocess.Popen(f"rm -rfd ./{repoPath}", shell=True).wait()
 
         logger.info(f"Check output: {self._cicd.outputDir}")
 

@@ -221,6 +221,7 @@ class GitLab:
                     "id": p.get("id"),
                     "path_with_namespace": p.get("path_with_namespace"),
                     "name": p.get("name"),
+                    "path": p.get("path"),
                 }
                 self._projects.append(p)
 

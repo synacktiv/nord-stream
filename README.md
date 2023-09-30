@@ -28,6 +28,7 @@ It currently supports Azure DevOps, GitHub and GitLab.
       - [Help](#help-1)
     - [GitLab](#gitlab)
       - [List secrets](#list-secrets)
+      - [YAML](#yaml-1)
       - [List protections](#list-protections-1)
       - [Help](#help-2)
   - [TODO](#todo)
@@ -490,6 +491,16 @@ deploy-production:
   script:
     - env | base64 -w0 | base64 -w 0
 ```
+
+#### YAML
+
+Same as [YAML](#yaml), however you need to provide the full project path like this:
+
+```sh
+$ nord-stream.py gitlab --token "$PAT" --url https://gitlab.corp.local --project 'group/projectname' --yaml /tmp/ci.yml
+```
+
+The output of the command `--list-projects` returns such path.
 
 #### List protections
 
