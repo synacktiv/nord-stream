@@ -170,7 +170,7 @@ class GitLab:
 
                 date = time.strftime("%Y-%m-%d_%H-%M-%S")
                 name = "".join(
-                    [c for c in secFile.get("name") if c.isalpha() or c.isdigit() or c in (" ", ".")]
+                    [c for c in secFile.get("name") if c.isalpha() or c.isdigit() or c in (" ", ".", "-", "_")]
                 ).strip()
                 fileName = f"securefile_{date}_{name}"
 
