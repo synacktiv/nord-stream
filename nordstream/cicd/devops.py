@@ -414,8 +414,6 @@ class DevOps:
     def getRunId(self, project, pipelineId):
         logger.debug(f"Getting RunId for pipeline: {pipelineId}")
 
-        found = False
-
         for i in range(self._maxRetry):
 
             # Don't wait first time

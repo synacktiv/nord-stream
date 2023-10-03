@@ -138,7 +138,7 @@ class GitLab:
 
         status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/variables")
 
-        if status_code == 200:
+        if status_code == 200 and len(response) > 0:
 
             path = self.__createOutputDir(project.get("path_with_namespace"))
 
@@ -154,13 +154,52 @@ class GitLab:
             raise GitLabError(response.get("message"))
         return res
 
+    def listSecureFilesFromProject(self, project):
+        logger.debug("Getting project secure files")
+        id = project.get("id")
+
+        res = []
+
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/secure_files")
+        if status_code == 200 and len(response) > 0:
+
+            path = self.__createOutputDir(project.get("path_with_namespace"))
+            date = time.strftime("%Y-%m-%d_%H-%M-%S")
+
+            for secFile in response:
+
+                date = time.strftime("%Y-%m-%d_%H-%M-%S")
+                name = "".join(
+                    [c for c in secFile.get("name") if c.isalpha() or c.isdigit() or c in (" ", ".")]
+                ).strip()
+                fileName = f"securefile_{date}_{name}"
+
+                f = open(f"{path}/{fileName}", "wb")
+
+                content = self._session.get(
+                    f"{self._gitlabURL}/api/v4/projects/{id}/secure_files/{secFile.get('id')}/download",
+                    headers=self._header,
+                    verify=self._verifyCert,
+                )
+
+                # handle large files
+                for chunk in content.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                f.close()
+
+                res.append({"name": secFile.get("name"), "path": f"{path}/{fileName}"})
+
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
+        return res
+
     def listVariablesFromGroup(self, group):
         id = group.get("id")
         res = []
 
         status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/groups/{id}/variables")
 
-        if status_code == 200:
+        if status_code == 200 and len(response) > 0:
 
             path = self.__createOutputDir(group.get("full_path"))
 
@@ -180,7 +219,7 @@ class GitLab:
         res = []
         status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/admin/ci/variables")
 
-        if status_code == 200:
+        if status_code == 200 and len(response) > 0:
 
             path = self.__createOutputDir("")
 
@@ -385,7 +424,7 @@ class GitLab:
                 if response.get("title") != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
                     continue
 
-                if response.get("author_name") != Git.LOCAL_USERNAME:
+                if response.get("author_name") != Git.USER:
                     continue
 
             pipelineId = pipeline.get("id")

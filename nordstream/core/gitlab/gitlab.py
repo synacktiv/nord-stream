@@ -121,34 +121,55 @@ class GitLabRunner:
     def listGitLabSecrets(self):
         logger.info("Listing GitLab secrets")
 
+        res = False
         if self._extractInstance:
-            self.__listGitLabInstanceSecrets()
+            res |= self.__listGitLabInstanceSecrets()
 
         if self._extractGroup:
-            self.__listGitLabGroupSecrets()
+            res |= self.__listGitLabGroupSecrets()
 
         if self._extractProject:
-            self.__listGitLabProjectSecrets()
+            res |= self.__listGitLabProjectSecrets()
+            res |= self.__listGitLabProjectSecureFiles()
+
+        if not res:
+            logger.warning(
+                "You don't have access to any secret, try to deploy a pipeline and exfiltrate environment variables"
+            )
 
     def __listGitLabProjectSecrets(self):
+        res = False
         for project in self._cicd.projects:
             try:
-                self.__displayProjectVariables(project)
+                res |= self.__displayProjectVariables(project)
             except Exception as e:
                 logger.error(f"Error while listing secrets for {project.get('name')}: {e}")
+        return res
+
+    def __listGitLabProjectSecureFiles(self):
+        res = False
+        for project in self._cicd.projects:
+            try:
+                res |= self.__displayProjectSecureFiles(project)
+            except Exception as e:
+                logger.error(f"Error while listing secure files for {project.get('name')}: {e}")
+        return res
 
     def __listGitLabGroupSecrets(self):
+        res = False
         for group in self._cicd.groups:
             try:
-                self.__displayGroupVariables(group)
+                res |= self.__displayGroupVariables(group)
             except Exception as e:
                 logger.error(f"Error while listing secrets for {group.get('name')}: {e}")
+        return res
 
     def __listGitLabInstanceSecrets(self):
         try:
-            self.__displayInstanceVariables()
+            return self.__displayInstanceVariables()
         except Exception as e:
             logger.error(f"Error while listing instance secrets: {e}")
+            return False
 
     def __displayProjectVariables(self, project):
 
@@ -161,14 +182,34 @@ class GitLabRunner:
                 logger.info(f'"{projectName}" project variables')
 
                 for variable in variables:
-                    value = variable.get("value")
-                    protected = variable.get("protected")
                     logger.raw(
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
+                return True
         except GitLabError as e:
-            logger.info(f'"{projectName}" variables')
-            logger.error(f"\t{e}")
+            if logger.getEffectiveLevel() < logging.INFO:
+                logger.info(f'"{projectName}" variables')
+                logger.error(f"\t{e}")
+        return False
+
+    def __displayProjectSecureFiles(self, project):
+
+        projectName = project.get("path_with_namespace")
+
+        try:
+            secFiles = self._cicd.listSecureFilesFromProject(project)
+            if len(secFiles) != 0:
+
+                logger.info(f'"{projectName}" secure files')
+
+                for file in secFiles:
+                    logger.raw(f'\t- {file["name"]} ({file["path"]})\n', logging.INFO)
+                return True
+        except GitLabError as e:
+            if logger.getEffectiveLevel() < logging.INFO:
+                logger.info(f'"{projectName}" secure files')
+                logger.error(f"\t{e}")
+        return False
 
     def __displayGroupVariables(self, group):
 
@@ -180,14 +221,15 @@ class GitLabRunner:
                 logger.info(f'"{groupPath}" group variables:')
 
                 for variable in variables:
-                    value = variable.get("value")
-                    protected = variable.get("protected")
                     logger.raw(
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
+                return True
         except GitLabError as e:
-            logger.info(f'"{groupPath}" group variables:')
-            logger.error(f"\t{e}")
+            if logger.getEffectiveLevel() < logging.INFO:
+                logger.info(f'"{groupPath}" group variables:')
+                logger.error(f"\t{e}")
+        return False
 
     def __displayInstanceVariables(self):
         try:
@@ -195,14 +237,15 @@ class GitLabRunner:
             if len(variables) != 0:
                 logger.info("Instance variables:")
                 for variable in variables:
-                    value = variable.get("value")
-                    protected = variable.get("protected")
                     logger.raw(
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
+                return True
         except GitLabError as e:
-            logger.info("Instance variables:")
-            logger.error(f"\t{e}")
+            if logger.getEffectiveLevel() < logging.INFO:
+                logger.info("Instance variables:")
+                logger.error(f"\t{e}")
+        return False
 
     def listGitLabProjects(self):
         logger.info("Listing GitLab projects")
