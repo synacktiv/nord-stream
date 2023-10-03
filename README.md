@@ -492,6 +492,8 @@ deploy-production:
     - env | base64 -w0 | base64 -w 0
 ```
 
+GitLab also support secure files like Azure DevOps. Secure files are defined at the project level. Like the variables It's not possible to list the secure files without admin access to the project. However, with admin access nord-stream will try to exfiltrate the secure files related to the projects.
+
 #### YAML
 
 Same as [YAML](#yaml), however you need to provide the full project path like this:
