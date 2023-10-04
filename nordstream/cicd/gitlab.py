@@ -30,7 +30,10 @@ class GitLab:
     def __init__(self, url, token, verifCert):
         self._gitlabURL = url.strip("/")
         self._token = token
-        self._header = {"PRIVATE-TOKEN": token}
+        self._header = {
+            "PRIVATE-TOKEN": token,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        }
         self._verifyCert = verifCert
         self._session = requests.Session()
         self._gitlabLogin = self.__getLogin()

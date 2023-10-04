@@ -14,7 +14,10 @@ class GitHub:
     _org = None
     _githubLogin = None
     _repos = []
-    _header = {"Accept": "application/vnd.github+json"}
+    _header = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    }
     _repoURL = "https://api.github.com/repos"
     _session = None
     _branchName = _DEFAULT_BRANCH_NAME

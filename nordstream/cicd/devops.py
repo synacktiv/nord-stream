@@ -16,7 +16,10 @@ class DevOps:
     _devopsLoginId = None
     _projects = []
     _baseURL = "https://dev.azure.com/"
-    _header = {"Accept": "application/json; api-version=6.0-preview"}
+    _header = {
+        "Accept": "application/json; api-version=6.0-preview",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+    }
     _session = None
     _repoName = "TestDev_ea5Eu"
     _outputDir = "nord-stream-logs"
