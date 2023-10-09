@@ -69,7 +69,7 @@ def start(argv):
 
     # check validity of the token
     if not GitLab.checkToken(args["--token"], args["--url"], (not args["--ignore-cert"])):
-        logger.critical("Invalid token")
+        logger.critical('Invalid token or the token doesn\'t have the "api" scope.')
 
     # gitlab setup
     gitlab = GitLab(args["--url"], args["--token"], (not args["--ignore-cert"]))
