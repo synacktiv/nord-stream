@@ -486,15 +486,15 @@ class GitLabRunner:
             if code_owner_approval_required != None:
                 logger.raw(f"\t- Code Owner approval required: {code_owner_approval_required}\n", logging.INFO)
 
-            push_access_levels = protection.get("push_access_levels")
+            push_access_levels = protection.get("push_access_levels", [])
             logger.raw(f"\t- Push access level:\n", logging.INFO)
             self.__displayAccessLevel(push_access_levels)
 
-            unprotect_access_levels = protection.get("unprotect_access_levels")
+            unprotect_access_levels = protection.get("unprotect_access_levels", [])
             logger.raw(f"\t- Unprotect access level:\n", logging.INFO)
             self.__displayAccessLevel(unprotect_access_levels)
 
-            merge_access_levels = protection.get("merge_access_levels")
+            merge_access_levels = protection.get("merge_access_levels", [])
             logger.raw(f"\t- Merge access level:\n", logging.INFO)
             self.__displayAccessLevel(merge_access_levels)
 
