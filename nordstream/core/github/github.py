@@ -12,7 +12,7 @@ from nordstream.core.github.protections import (
 )
 from nordstream.core.github.display import *
 from nordstream.utils.errors import GitHubError, GitPushError
-from nordstream.utils.log import logger
+from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 import subprocess
 
@@ -408,34 +408,42 @@ class GitHubWorkflowRunner:
     def listGitHubSecrets(self):
         logger.info("Listing secrets:")
         for repo in self._cicd.repos:
-            try:
-                logger.info(f'"{repo}" secrets')
+            logger.info(f'"{repo}" secrets')
 
-                if self._extractRepo:
-                    self.__displayRepoSecrets(repo)
+            if self._extractRepo:
+                self.__displayRepoSecrets(repo)
 
-                if self._extractEnv:
-                    self.__displayEnvSecrets(repo)
+            if self._extractEnv:
+                self.__displayEnvSecrets(repo)
 
-                if self._extractOrg:
-                    self.__displayOrgSecrets(repo)
-
-            except Exception:
-                logger.error("Need write acccess on the repo.")
+            if self._extractOrg:
+                self.__displayOrgSecrets(repo)
 
     def __displayRepoSecrets(self, repo):
-        secrets = self._cicd.listSecretsFromRepo(repo)
-        displayRepoSecrets(secrets)
+        try:
+            secrets = self._cicd.listSecretsFromRepo(repo)
+            displayRepoSecrets(secrets)
+        except Exception:
+            if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
+                logger.error("Can't get repo secrets.")
 
     def __displayEnvSecrets(self, repo):
         envs = self._cicd.listEnvFromrepo(repo)
         for env in envs:
-            secrets = self._cicd.listSecretsFromEnv(repo, env)
-            displayEnvSecrets(env, secrets)
+            try:
+                secrets = self._cicd.listSecretsFromEnv(repo, env)
+                displayEnvSecrets(env, secrets)
+            except Exception:
+                if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
+                    logger.error(f"Can't get secrets for env {env}.")
 
     def __displayOrgSecrets(self, repo):
-        secrets = self._cicd.listOrganizationSecretsFromRepo(repo)
-        displayOrgSecrets(secrets)
+        try:
+            secrets = self._cicd.listOrganizationSecretsFromRepo(repo)
+            displayOrgSecrets(secrets)
+        except Exception:
+            if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
+                logger.error("Can't get org secrets.")
 
     def getRepos(self, repo):
         if repo:
