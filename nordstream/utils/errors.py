@@ -6,6 +6,10 @@ class GitHubError(Exception):
     pass
 
 
+class GitHubBadCredentials(Exception):
+    pass
+
+
 class GitLabError(Exception):
     pass
 

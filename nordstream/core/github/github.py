@@ -11,7 +11,7 @@ from nordstream.core.github.protections import (
     resetRestrictions,
 )
 from nordstream.core.github.display import *
-from nordstream.utils.errors import GitHubError, GitPushError
+from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 import subprocess
@@ -446,17 +446,22 @@ class GitHubWorkflowRunner:
                 logger.error("Can't get org secrets.")
 
     def getRepos(self, repo):
-        if repo:
-            if exists(repo):
-                with open(repo, "r") as file:
-                    for repo in file:
-                        self._cicd.addRepo(repo.strip())
+
+        try:
+            if repo:
+                if exists(repo):
+                    with open(repo, "r") as file:
+                        for repo in file:
+                            self._cicd.addRepo(repo.strip())
+
+                else:
+                    self._cicd.addRepo(repo)
 
             else:
-                self._cicd.addRepo(repo)
+                self._cicd.listRepos()
 
-        else:
-            self._cicd.listRepos()
+        except GitHubBadCredentials:
+            logger.fatal("Invalid token.")
 
         if self._writeAccessFilter:
             self._cicd.filterWriteRepos()

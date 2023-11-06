@@ -2,7 +2,7 @@ import requests
 import time
 from os import makedirs
 import urllib.parse
-from nordstream.utils.errors import GitHubError
+from nordstream.utils.errors import GitHubError, GitHubBadCredentials
 from nordstream.utils.log import logger
 from nordstream.git import Git
 
@@ -103,7 +103,9 @@ class GitHub:
             ).json()
 
             if not isinstance(response, list) and response.get("message", None):
-                if response.get("message") != "Not Found":
+                if response.get("message") == "Bad credentials":
+                    raise GitHubBadCredentials(response.get("message"))
+                elif response.get("message") != "Not Found":
                     raise GitHubError(response.get("message"))
                 return res
 
@@ -150,11 +152,15 @@ class GitHub:
             else:
                 # FIXME: Raise an Exception here
                 logger.error("Invalid repo name: {repo}")
+
         response = self._session.get(
             f"{self._repoURL}/{full_name}",
             auth=self._auth,
             headers=self._header,
         ).json()
+
+        if response.get("message", None) and response.get("message") == "Bad credentials":
+            raise GitHubBadCredentials(response.get("message"))
 
         if response.get("id"):
             self._repos.append(response.get("full_name"))
