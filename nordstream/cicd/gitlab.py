@@ -495,7 +495,31 @@ class GitLab:
         if status_code == 403:
             raise GitLabError(response.get("message"))
 
+        # sometimes GitLab return a 404 and not an empty array
+        if status_code == 404:
+            project = self.getProject(projectId)
+
+            # if the repo is empty raise an error since there is no branch
+            if project.get("empty_repo"):
+                raise GitLabError("The project is empty and has no branches.")
+            else:
+                raise GitLabError("Got 404 for unknown reason.")
+
         return response
+
+    def getProject(self, projectId):
+        logger.debug("Getting project: {projectId}")
+
+        response = self._session.get(
+            f"{self._gitlabURL}/api/v4/projects/{projectId}",
+            headers=self._header,
+            verify=self._verifyCert,
+        )
+
+        if response.status_code != 200:
+            raise GitLabError(response.json().get("message"))
+        else:
+            return response.json()
 
     def getFailureReasonPipeline(self, projectId, pipelineId):
 
