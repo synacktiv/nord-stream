@@ -530,13 +530,21 @@ class GitHubWorkflowRunner:
             return False
         return True
 
-    def __clean(self, repo):
+    def __clean(self, repo, cleanRemoteLogs=True):
 
         if self._pushedCommitsCount > 0:
 
-            if self._cleanLogs:
+            if cleanRemoteLogs:
                 logger.info("Cleaning logs.")
-                self._cicd.cleanAllLogs(repo, self._workflowFilename)
+
+                try:
+
+                    self._cicd.cleanAllLogs(repo, self._workflowFilename)
+
+                except Exception as e:
+                    logger.error(f"Error while cleaning logs: {e}")
+                    if self._cicd.isGHSToken():
+                        logger.warn(f"This might be due to the GHS token.")
 
             logger.verbose("Cleaning commits.")
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
@@ -581,7 +589,7 @@ class GitHubWorkflowRunner:
 
             finally:
 
-                self.__clean(repo)
+                self.__clean(repo, cleanRemoteLogs=self._cleanLogs)
 
                 # if we are working with the default nord-stream branch we managed to
                 # delete the branch during the previous clean operation
@@ -604,8 +612,14 @@ class GitHubWorkflowRunner:
             self.__runSecretsExtractionWorkflow(repo)
 
     def __checkAllEnvSecurity(self, repo):
-        for env in self._cicd.listEnvFromrepo(repo):
-            self.__checkSingleEnvSecurity(repo, env)
+
+        try:
+            for env in self._cicd.listEnvFromrepo(repo):
+                self.__checkSingleEnvSecurity(repo, env)
+        except GitHubError as e:
+            logger.error(f"Error while getting env security: {e}")
+            if self._cicd.isGHSToken():
+                logger.warn(f"This might be due to the GHS token.")
 
     def __checkSingleEnvSecurity(self, repo, env):
         envDetails = self._cicd.getEnvDetails(repo, env)
@@ -641,10 +655,12 @@ class GitHubWorkflowRunner:
 
                 self.__checkAllEnvSecurity(repo)
 
-            except Exception:
-                pass
+            except Exception as e:
+                if logger.getEffectiveLevel() == logging.DEBUG:
+                    logger.exception(e)
             finally:
-                self.__clean(repo)
+                # don't clean remote logs as we didn't push any workflow here.
+                self.__clean(repo, cleanRemoteLogs=False)
                 chdir("../")
                 subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
 

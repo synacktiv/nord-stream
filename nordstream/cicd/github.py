@@ -555,3 +555,6 @@ class GitHub:
             except GitHubError:
                 pass
         self._repos = res
+
+    def isGHSToken(self):
+        return self._isGHSToken
