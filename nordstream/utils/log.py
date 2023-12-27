@@ -14,7 +14,7 @@ from rich.logging import RichHandler
 class WhitespaceStrippingConsole(Console):
     def _render_buffer(self, *args, **kwargs):
         rendered = super()._render_buffer(*args, **kwargs)
-        newline_char = "\n" if rendered[-1] == "\n" else ""
+        newline_char = "\n" if len(rendered) >= 1 and rendered[-1] == "\n" else ""
         return "\n".join(line.rstrip() for line in rendered.splitlines()) + newline_char
 
 
