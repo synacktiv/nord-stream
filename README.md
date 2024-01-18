@@ -4,6 +4,8 @@ Nord Stream is a tool that allows you extract secrets stored inside CI/CD enviro
 
 It currently supports Azure DevOps, GitHub and GitLab.
 
+Find out more in the following blogpost: https://www.synacktiv.com/publications/cicd-secrets-extraction-tips-and-tricks
+
 ## Table of Contents
 
 - [Nord Stream](#nord-stream)
