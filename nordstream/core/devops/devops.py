@@ -276,7 +276,7 @@ class DevOpsRunner:
     @staticmethod
     def __doubleb64(output):
         # well it's working
-        data = output.readlines()[-2].split(b" ")[1]
+        data = output.readlines()[-3].split(b" ")[1]
         return base64.b64decode(base64.b64decode(data))
 
     @staticmethod
