@@ -204,14 +204,14 @@ class DevOpsRunner:
         elif self._extractVariableGroups:
 
             try:
-                secrets += len(self._cicd.listProjectVariableGroupsSecrets(projectId)) != 0
+                secrets += len(self._cicd.listProjectVariableGroupsSecrets(projectId))
             except DevOpsError as e:
                 logger.error(f"Error while listing variable groups: {e}")
 
         elif self._extractSecureFiles:
 
             try:
-                secrets += len(self._cicd.listProjectSecureFiles(projectId)) != 0
+                secrets += len(self._cicd.listProjectSecureFiles(projectId))
             except DevOpsError as e:
                 logger.error(f"Error while listing secure files: {e}")
 
