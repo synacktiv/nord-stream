@@ -188,6 +188,7 @@ class DevOpsRunner:
     def __checkSecrets(self, project):
         projectId = project.get("id")
         projectName = project.get("name")
+        secrets = 0
 
         if (
             self._extractAzureServiceconnections
@@ -196,27 +197,28 @@ class DevOpsRunner:
         ):
 
             try:
-                return len(self._cicd.listServiceConnections(projectId)) != 0
+                secrets += len(self._cicd.listServiceConnections(projectId))
             except DevOpsError as e:
-                return False
+                logger.error(f"Error while listing service connection: {e}")
 
         elif self._extractVariableGroups:
 
             try:
-                return len(self._cicd.listProjectVariableGroupsSecrets(projectId)) != 0
+                secrets += len(self._cicd.listProjectVariableGroupsSecrets(projectId)) != 0
             except DevOpsError as e:
-                return False
+                logger.error(f"Error while listing variable groups: {e}")
 
         elif self._extractSecureFiles:
 
             try:
-                return len(self._cicd.listProjectSecureFiles(projectId)) != 0
+                secrets += len(self._cicd.listProjectSecureFiles(projectId)) != 0
             except DevOpsError as e:
-                return False
+                logger.error(f"Error while listing secure files: {e}")
 
-        else:
+        if secrets == 0:
             logger.info(f'No secrets found for project "{projectName}" / "{projectId}"')
             return False
+        return True
 
     def createYaml(self, pipelineType):
         pipelineGenerator = DevOpsPipelineGenerator()
