@@ -201,14 +201,14 @@ class DevOpsRunner:
             except DevOpsError as e:
                 logger.error(f"Error while listing service connection: {e}")
 
-        elif self._extractVariableGroups:
+        if self._extractVariableGroups:
 
             try:
                 secrets += len(self._cicd.listProjectVariableGroupsSecrets(projectId))
             except DevOpsError as e:
                 logger.error(f"Error while listing variable groups: {e}")
 
-        elif self._extractSecureFiles:
+        if self._extractSecureFiles:
 
             try:
                 secrets += len(self._cicd.listProjectSecureFiles(projectId))
