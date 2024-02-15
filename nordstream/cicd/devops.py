@@ -494,6 +494,12 @@ class DevOps:
             if len(logs) != 0:
                 break
 
+            # if there are logs but we didn't find the taskName get the last
+            # job as it contain all data
+            if len(buildTimeline["records"]) > 0:
+                logs = [buildTimeline["records"][-1]["log"]["id"]]
+                break
+
             if i == (self._maxRetry - 1):
                 logger.error("Output still no ready, error !")
                 return None
