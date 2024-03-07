@@ -222,17 +222,14 @@ class DevOpsRunner:
 
     def createYaml(self, pipelineType):
         pipelineGenerator = DevOpsPipelineGenerator()
-        if pipelineType == "default":
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
-        elif pipelineType == "github":
+        if pipelineType == "github":
             pipelineGenerator.generatePipelineForGitHub("#FIXME")
         elif pipelineType == "azurerm":
             pipelineGenerator.generatePipelineForAzureRm("#FIXME")
         elif pipelineType == "aws":
             pipelineGenerator.generatePipelineForAWS("#FIXME")
         else:
-            pipelineGenerator.defaultTemplate = ""
-            logger.error(f"Invalid type: {pipelineType}")
+            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()

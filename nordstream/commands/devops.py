@@ -2,9 +2,9 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --no-aws --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
+    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --no-aws --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
     nord-stream.py devops [options] --token <pat> --org <org> --list-secrets [--project <project> --write-filter]
@@ -17,12 +17,12 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
+args:
     --token <pat>                           Azure DevOps personal token
     --org <org>                             Org name
     -p, --project <project>                 Run on selected project (can be a file)
@@ -90,7 +90,9 @@ def start(argv):
 
     if args["--key-id"]:
         Git.KEY_ID = args["--key-id"]
+    if args["--user"]:
         Git.USER = args["--user"]
+    if args["--email"]:
         Git.EMAIL = args["--email"]
 
     if args["--yaml"]:

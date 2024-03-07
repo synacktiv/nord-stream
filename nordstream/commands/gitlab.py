@@ -4,7 +4,7 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream.py gitlab [options] --token <pat> --describe-token
 
@@ -17,12 +17,12 @@ Options:
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
     --ignore-cert                           Allow insecure server connections
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
+args:
     --token <pat>                           GitLab personal token
     --project <project>                     Run on selected project (can be a file)
     --group <group>                         Run on selected group (can be a file)
@@ -79,7 +79,9 @@ def start(argv):
 
     if args["--key-id"]:
         Git.KEY_ID = args["--key-id"]
+    if args["--user"]:
         Git.USER = args["--user"]
+    if args["--email"]:
         Git.EMAIL = args["--email"]
 
     if args["--branch-name"]:

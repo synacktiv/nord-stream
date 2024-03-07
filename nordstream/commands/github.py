@@ -2,13 +2,13 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
-    nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
-    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--build-type <type> --env <env>]
+    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream.py github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections]
     nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream.py github [options] --token <ghp> --describe-token
@@ -20,12 +20,12 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
+args:
     --token <ghp>                           Github personal token
     --org <org>                             Org name
     -r, --repo <repo>                       Run on selected repo (can be a file)
@@ -34,6 +34,7 @@ args
     --no-clean                              Don't clean workflow logs (default false)
     --clean-branch-policy                   Remove branch policy, can be used with --repo. This operation is done by default but can be manually triggered.
     --build-yaml <filename>                 Create a pipeline yaml file with all secrets.
+    --build-type <type>                     Type used to generate the yaml file can be: default, azureoidc, awsoidc
     --env <env>                             Specify env for the yaml file creation.
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
@@ -95,7 +96,9 @@ def start(argv):
 
     if args["--key-id"]:
         Git.KEY_ID = args["--key-id"]
+    if args["--user"]:
         Git.USER = args["--user"]
+    if args["--email"]:
         Git.EMAIL = args["--email"]
 
     # runner setup
@@ -145,7 +148,7 @@ def start(argv):
     elif args["--build-yaml"]:
         gitHubWorkflowRunner.writeAccessFilter = True
         gitHubWorkflowRunner.workflowFilename = args["--build-yaml"]
-        gitHubWorkflowRunner.createYaml(args["--repo"])
+        gitHubWorkflowRunner.createYaml(args["--repo"], args["--build-type"])
 
     # Cleaning
     elif args["--clean-logs"] or args["--clean-branch-policy"]:

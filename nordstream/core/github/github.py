@@ -234,27 +234,36 @@ class GitHubWorkflowRunner:
                     logger.raw(line, logging.INFO)
                     line = output.readline()
 
-    def createYaml(self, repo):
-        repo = self._cicd.org + "/" + repo
+    def createYaml(self, repo, workflowType):
 
-        if self._env:
-            try:
-                secrets = self._cicd.listSecretsFromEnv(repo, self._env)
-            except GitHubError as e:
-                # FIXME: Raise an Exception here
-                logger.exception(e)
+        workflowGenerator = WorkflowGenerator()
+
+        if workflowType == "awsoidc":
+            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self._role, self._region, self._env)
+        elif workflowType == "azureoidc":
+            workflowGenerator.generateWorkflowForOIDCAzureTokenGeneration(
+                self._tenantId, self._subscriptionId, self._clientId, self._env
+            )
         else:
-            secrets = self._cicd.listSecretsFromRepo(repo)
+            repo = self._cicd.org + "/" + repo
 
-        if len(secrets) > 0:
-            workflowGenerator = WorkflowGenerator()
-            workflowGenerator.generateWorkflowForSecretsExtraction(secrets, self._env)
+            if self._env:
+                try:
+                    secrets = self._cicd.listSecretsFromEnv(repo, self._env)
+                except GitHubError as e:
+                    # FIXME: Raise an Exception here
+                    logger.exception(e)
+            else:
+                secrets = self._cicd.listSecretsFromRepo(repo)
 
-            logger.success("YAML file: ")
-            workflowGenerator.displayYaml()
-            workflowGenerator.writeFile(self._workflowFilename)
-        else:
-            logger.info("No secret found.")
+            if len(secrets) > 0:
+                workflowGenerator.generateWorkflowForSecretsExtraction(secrets, self._env)
+            else:
+                logger.info("No secret found.")
+
+        logger.success("YAML file: ")
+        workflowGenerator.displayYaml()
+        workflowGenerator.writeFile(self._workflowFilename)
 
     def __extractSecretsFromRepo(self, repo):
         logger.info(f'Getting secrets from repo: "{repo}"')
