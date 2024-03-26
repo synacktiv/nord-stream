@@ -437,7 +437,13 @@ class GitHubWorkflowRunner:
                 logger.error("Can't get repo secrets.")
 
     def __displayEnvSecrets(self, repo):
-        envs = self._cicd.listEnvFromrepo(repo)
+        try:
+            envs = self._cicd.listEnvFromrepo(repo)
+        except Exception:
+            if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
+                logger.error("Can't list environment.")
+            return
+
         for env in envs:
             try:
                 secrets = self._cicd.listSecretsFromEnv(repo, env)
