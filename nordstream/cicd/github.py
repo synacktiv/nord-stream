@@ -30,19 +30,21 @@ class GitHub:
         self._token = token
         self._auth = ("foo", self._token)
         self._session = requests.Session()
-        self._githubLogin = self.__getLogin()
         if token.lower().startswith("ghs_"):
             self._isGHSToken = True
+
+        self._githubLogin = self.__getLogin()
 
     @staticmethod
     def checkToken(token):
         logger.verbose(f"Checking token: {token}")
-        if token.lower().startswith("ghs_"):
-            logger.warning(
-                "You are using a GHS token this will break some part of this tool. Some research must be done with this particular type of token."
-            )
-            return True
-        return requests.get(f"https://api.github.com/user", auth=("foo", token)).status_code == 200
+
+        headers = GitHub._header
+        headers["Authorization"] = f"token {token}"
+
+        data = {"query": "query UserCurrent{viewer{login}}"}
+
+        return requests.post("https://api.github.com/graphql", headers=headers, json=data).status_code == 200
 
     @property
     def token(self):
@@ -81,11 +83,21 @@ class GitHub:
         self._outputDir = value
 
     def __getLogin(self):
-        return self.getUser().json().get("login")
+        return self.getLoginWithGraphQL().json().get("data").get("viewer").get("login")
 
     def getUser(self):
         logger.debug("Retrieving user informations")
         return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header)
+
+    def getLoginWithGraphQL(self):
+        logger.debug("Retrieving identity with GraphQL")
+
+        headers = self._header
+        headers["Authorization"] = f"token {self._token}"
+
+        data = {"query": "query UserCurrent{viewer{login}}"}
+
+        return self._session.post("https://api.github.com/graphql", headers=headers, json=data)
 
     def __paginatedGet(self, url, data=""):
 

@@ -806,43 +806,52 @@ class GitHubWorkflowRunner:
         self._cicd.modifyEnvProtectionRules(repo, env, waitTime, reviewers, branchPolicy)
 
     def describeToken(self):
-        response = self._cicd.getUser()
-        headers = response.headers
-        response = response.json()
 
-        logger.info("Token information:")
+        if self._cicd.isGHSToken():
+            response = self._cicd.getLoginWithGraphQL().json()
+            logger.info("Token information:")
+            login = response.get("data").get("viewer").get("login")
+            if login != None:
+                logger.raw(f"\t- Login: {login}\n", logging.INFO)
 
-        login = response.get("login")
-        if login != None:
-            logger.raw(f"\t- Login: {login}\n", logging.INFO)
+        else:
+            response = self._cicd.getUser()
+            headers = response.headers
+            response = response.json()
 
-        isAdmin = response.get("site_admin")
-        if isAdmin != None:
-            logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
+            logger.info("Token information:")
 
-        email = response.get("email")
-        if email != None:
-            logger.raw(f"\t- Email: {email}\n", logging.INFO)
+            login = response.get("login")
+            if login != None:
+                logger.raw(f"\t- Login: {login}\n", logging.INFO)
 
-        id = response.get("id")
-        if id != None:
-            logger.raw(f"\t- Id: {id}\n", logging.INFO)
+            isAdmin = response.get("site_admin")
+            if isAdmin != None:
+                logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
 
-        bio = response.get("bio")
-        if bio != None:
-            logger.raw(f"\t- Bio: {bio}\n", logging.INFO)
+            email = response.get("email")
+            if email != None:
+                logger.raw(f"\t- Email: {email}\n", logging.INFO)
 
-        company = response.get("company")
-        if company != None:
-            logger.raw(f"\t- Company: {company}\n", logging.INFO)
+            id = response.get("id")
+            if id != None:
+                logger.raw(f"\t- Id: {id}\n", logging.INFO)
 
-        tokenScopes = headers.get("x-oauth-scopes")
-        if tokenScopes != None:
-            scopes = tokenScopes.split(", ")
-            if len(scopes) != 0:
-                logger.raw(f"\t- Token scopes:\n", logging.INFO)
-                for scope in scopes:
-                    logger.raw(f"\t    - {scope}\n", logging.INFO)
+            bio = response.get("bio")
+            if bio != None:
+                logger.raw(f"\t- Bio: {bio}\n", logging.INFO)
+
+            company = response.get("company")
+            if company != None:
+                logger.raw(f"\t- Company: {company}\n", logging.INFO)
+
+            tokenScopes = headers.get("x-oauth-scopes")
+            if tokenScopes != None:
+                scopes = tokenScopes.split(", ")
+                if len(scopes) != 0:
+                    logger.raw(f"\t- Token scopes:\n", logging.INFO)
+                    for scope in scopes:
+                        logger.raw(f"\t    - {scope}\n", logging.INFO)
 
     def __resetBranchProtectionRules(self, repo, protections):
 
