@@ -272,8 +272,12 @@ class GitHubWorkflowRunner:
         try:
             if self._extractRepo:
                 secrets += self._cicd.listSecretsFromRepo(repo)
+                # we can't extract dependabot secrets from regular workflows
+                # secrets += self._cicd.listDependabotSecretsFromRepo(repo)
             if self._extractOrg:
                 secrets += self._cicd.listOrganizationSecretsFromRepo(repo)
+                # we can't extract dependabot secrets from regular workflows
+                # secrets += self._cicd.listDependabotOrganizationSecrets()
         except GitHubError as e:
             logger.error(e)
 
@@ -416,6 +420,9 @@ class GitHubWorkflowRunner:
 
     def listGitHubSecrets(self):
         logger.info("Listing secrets:")
+        if self._extractOrg:
+            self.__displayDependabotOrgSecrets()
+
         for repo in self._cicd.repos:
             logger.info(f'"{repo}" secrets')
 
@@ -432,6 +439,9 @@ class GitHubWorkflowRunner:
         try:
             secrets = self._cicd.listSecretsFromRepo(repo)
             displayRepoSecrets(secrets)
+
+            secrets = self._cicd.listDependabotSecretsFromRepo(repo)
+            displayDependabotRepoSecrets(secrets)
         except Exception:
             if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
                 logger.error("Can't get repo secrets.")
@@ -456,6 +466,14 @@ class GitHubWorkflowRunner:
         try:
             secrets = self._cicd.listOrganizationSecretsFromRepo(repo)
             displayOrgSecrets(secrets)
+        except Exception:
+            if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
+                logger.error("Can't get org secrets.")
+
+    def __displayDependabotOrgSecrets(self):
+        try:
+            secrets = self._cicd.listDependabotOrganizationSecrets()
+            displayDependabotOrgSecrets(secrets)
         except Exception:
             if logger.getEffectiveLevel() == NordStreamLog.VERBOSE:
                 logger.error("Can't get org secrets.")

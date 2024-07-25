@@ -10,6 +10,13 @@ def displayRepoSecrets(secrets):
             logger.raw(f"\t- {secret}\n", logging.INFO)
 
 
+def displayDependabotRepoSecrets(secrets):
+    if len(secrets) != 0:
+        logger.info("Dependabot repo secrets:")
+        for secret in secrets:
+            logger.raw(f"\t- {secret}\n", logging.INFO)
+
+
 def displayEnvSecrets(env, secrets):
     if len(secrets) != 0:
         logger.info(f"{env} secrets:")
@@ -20,6 +27,13 @@ def displayEnvSecrets(env, secrets):
 def displayOrgSecrets(secrets):
     if len(secrets) != 0:
         logger.info("Repository organization secrets:")
+        for secret in secrets:
+            logger.raw(f"\t- {secret}\n", logging.INFO)
+
+
+def displayDependabotOrgSecrets(secrets):
+    if len(secrets) != 0:
+        logger.info("Dependabot organization secrets:")
         for secret in secrets:
             logger.raw(f"\t- {secret}\n", logging.INFO)
 

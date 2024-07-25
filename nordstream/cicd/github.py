@@ -218,6 +218,26 @@ class GitHub:
 
         return res
 
+    def listDependabotSecretsFromRepo(self, repo):
+        res = []
+
+        response = self.__paginatedGet(f"{self._repoURL}/{repo}/dependabot/secrets", data="secrets")
+
+        for sec in response:
+            res.append(sec.get("name"))
+
+        return res
+
+    def listDependabotOrganizationSecrets(self):
+        res = []
+
+        response = self.__paginatedGet(f"https://api.github.com/orgs/{self._org}/dependabot/secrets", data="secrets")
+
+        for sec in response:
+            res.append(sec.get("name"))
+
+        return res
+
     def listEnvProtections(self, repo, env):
         logger.debug("Getting environment protections")
         envReq = urllib.parse.quote(env, safe="")
