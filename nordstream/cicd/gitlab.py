@@ -5,6 +5,7 @@ from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
 from nordstream.utils.constants import *
+from nordstream.utils.helpers import isGitLabSessionCookie
 import urllib3
 
 # painfull warnings you know what you are doing right ?
@@ -19,9 +20,11 @@ class GitLab:
     _projects = []
     _groups = []
     _outputDir = OUTPUT_DIR
-    _header = None
+    _headers = {
+        "User-Agent": USER_AGENT,
+    }
+    _cookies = {}
     _gitlabURL = None
-    _verifyCert = True
     _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
     _maxRetry = 10
@@ -29,14 +32,10 @@ class GitLab:
     def __init__(self, url, token, verifCert):
         self._gitlabURL = url.strip("/")
         self._token = token
-        self._header = {
-            "PRIVATE-TOKEN": token,
-            "User-Agent": USER_AGENT,
-        }
-        self._verifyCert = verifCert
         self._session = requests.Session()
+        self._session.verify = verifCert
+        self.setCookiesAndHeaders()
         self._gitlabLogin = self.__getLogin()
-        # self._session.headers.update({"PRIVATE-TOKEN": token})
 
     @property
     def projects(self):
@@ -79,10 +78,19 @@ class GitLab:
         logger.verbose(f"Checking token: {token}")
         # from https://docs.gitlab.com/ee/api/rest/index.html#personalprojectgroup-access-tokens
         try:
+            cookies = {}
+            headers = {"User-Agent": USER_AGENT}
+
+            if isGitLabSessionCookie(token):
+                cookies["_gitlab_session"] = token
+            else:
+                headers["PRIVATE-TOKEN"] = token
+
             return (
                 requests.get(
                     f"{gitlabURL.strip('/')}/api/v4/user",
-                    headers={"PRIVATE-TOKEN": token},
+                    headers=headers,
+                    cookies=cookies,
                     verify=verifyCert,
                 ).status_code
                 == 200
@@ -98,11 +106,13 @@ class GitLab:
     def getUser(self):
         logger.debug(f"Retrieving user informations")
 
-        return self._session.get(
-            f"{self._gitlabURL}/api/v4/user",
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        return self._session.get(f"{self._gitlabURL}/api/v4/user").json()
+
+    def setCookiesAndHeaders(self):
+        if isGitLabSessionCookie(self._token):
+            self._session.cookies.update({"_gitlab_session": self._token})
+        else:
+            self._session.headers.update({"PRIVATE-TOKEN": self._token})
 
     def __paginatedGet(self, url, params={}):
 
@@ -115,12 +125,7 @@ class GitLab:
 
             params["page"] = i
 
-            response = self._session.get(
-                url,
-                headers=self._header,
-                params=params,
-                verify=self._verifyCert,
-            )
+            response = self._session.get(url, params=params)
 
             if response.status_code == 200:
                 if len(response.json()) == 0:
@@ -179,9 +184,7 @@ class GitLab:
                 f = open(f"{path}/{fileName}", "wb")
 
                 content = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{id}/secure_files/{secFile.get('id')}/download",
-                    headers=self._header,
-                    verify=self._verifyCert,
+                    f"{self._gitlabURL}/api/v4/projects/{id}/secure_files/{secFile.get('id')}/download"
                 )
 
                 # handle large files
@@ -309,9 +312,7 @@ class GitLab:
         time.sleep(5)
 
         response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
-            headers=self._header,
-            verify=self._verifyCert,
+            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
         ).json()
 
         if response[0].get("status") not in COMPLETED_STATES:
@@ -320,9 +321,7 @@ class GitLab:
                 time.sleep(self._sleepTime)
 
                 response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}",
-                    headers=self._header,
-                    verify=self._verifyCert,
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
                 ).json()
 
                 if response[0].get("status") in COMPLETED_STATES:
@@ -380,21 +379,13 @@ class GitLab:
 
     def __getTraceForJobId(self, projectId, jobId):
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
+        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
 
         if response.status_code != 200:
             for i in range(self._maxRetry):
                 logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
-                response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace",
-                    headers=self._header,
-                    verify=self._verifyCert,
-                )
+                response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
                 if response.status_code == 200:
                     break
                 if i == (self._maxRetry - 1):
@@ -418,9 +409,7 @@ class GitLab:
                 commitId = pipeline.get("sha")
 
                 response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/commits/{commitId}",
-                    headers=self._header,
-                    verify=self._verifyCert,
+                    f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/commits/{commitId}"
                 ).json()
 
                 if response.get("title") != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
@@ -430,11 +419,7 @@ class GitLab:
                     continue
 
             pipelineId = pipeline.get("id")
-            response = self._session.delete(
-                f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}",
-                headers=self._header,
-                verify=self._verifyCert,
-            )
+            response = self._session.delete(f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}")
 
     def cleanAllLogs(self, projectId):
         # deleting the pipeline removes everything
@@ -449,12 +434,7 @@ class GitLab:
 
             params = {"per_page": 100, "page": i}
 
-            response = self._session.get(
-                f"{self._gitlabURL}/api/v4/projects/{projectId}/events",
-                headers=self._header,
-                params=params,
-                verify=self._verifyCert,
-            )
+            response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/events", params=params)
 
             if response.status_code == 200:
                 if len(response.json()) == 0:
@@ -463,11 +443,7 @@ class GitLab:
                 for event in response.json():
                     eventId = event.get("id")
                     # don't work
-                    response = self._session.delete(
-                        f"{self._gitlabURL}/api/v4/projects/{projectId}/events/{eventId}",
-                        headers=self._header,
-                        verify=self._verifyCert,
-                    )
+                    response = self._session.delete(f"{self._gitlabURL}/api/v4/projects/{projectId}/events/{eventId}")
 
                 i += 1
             else:
@@ -509,11 +485,7 @@ class GitLab:
     def getProject(self, projectId):
         logger.debug("Getting project: {projectId}")
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}",
-            headers=self._header,
-            verify=self._verifyCert,
-        )
+        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}")
 
         if response.status_code != 200:
             raise GitLabError(response.json().get("message"))
@@ -522,11 +494,7 @@ class GitLab:
 
     def getFailureReasonPipeline(self, projectId, pipelineId):
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}",
-            headers=self._header,
-            verify=self._verifyCert,
-        ).json()
+        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}").json()
 
         return response.get("yaml_errors", None)
 
