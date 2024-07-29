@@ -23,7 +23,7 @@ Commit:
     --key-id <id>                           GPG primary key ID to sign commits
 
 args:
-    --token <pat>                           GitLab personal token
+    --token <pat>                           GitLab personal access token or _gitlab_session cookie
     --project <project>                     Run on selected project (can be a file)
     --group <group>                         Run on selected group (can be a file)
     --list-secrets                          List all secrets.

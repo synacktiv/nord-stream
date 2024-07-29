@@ -556,7 +556,7 @@ CICD pipeline exploitation tool
 Usage:
     nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream.py gitlab [options] --token <pat> --describe-token
 
@@ -567,14 +567,15 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
+    --ignore-cert                           Allow insecure server connections
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
-    --token <pat>                           GitLab personal token
+args:
+    --token <pat>                           GitLab personal access token or _gitlab_session cookie
     --project <project>                     Run on selected project (can be a file)
     --group <group>                         Run on selected group (can be a file)
     --list-secrets                          List all secrets.
