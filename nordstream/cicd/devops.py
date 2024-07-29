@@ -5,11 +5,12 @@ from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.git import Git
 from nordstream.utils.errors import DevOpsError
+from nordstream.utils.constants import *
 
 
 class DevOps:
-    _DEFAULT_PIPELINE_NAME = "Build_pipeline_58675"
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test/v1"
+    _DEFAULT_PIPELINE_NAME = DEFAULT_PIPELINE_NAME
+    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
     _token = None
     _auth = None
     _org = None
@@ -18,11 +19,11 @@ class DevOps:
     _baseURL = "https://dev.azure.com/"
     _header = {
         "Accept": "application/json; api-version=6.0-preview",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        "User-Agent": USER_AGENT,
     }
     _session = None
-    _repoName = "TestDev_ea5Eu"
-    _outputDir = "nord-stream-logs"
+    _repoName = DEFAULT_REPO_NAME
+    _outputDir = OUTPUT_DIR
     _pipelineName = _DEFAULT_PIPELINE_NAME
     _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15

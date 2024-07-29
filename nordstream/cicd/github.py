@@ -5,10 +5,11 @@ import urllib.parse
 from nordstream.utils.errors import GitHubError, GitHubBadCredentials
 from nordstream.utils.log import logger
 from nordstream.git import Git
+from nordstream.utils.constants import *
 
 
 class GitHub:
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test/v1"
+    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
     _token = None
     _auth = None
     _org = None
@@ -16,12 +17,12 @@ class GitHub:
     _repos = []
     _header = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        "User-Agent": USER_AGENT,
     }
     _repoURL = "https://api.github.com/repos"
     _session = None
     _branchName = _DEFAULT_BRANCH_NAME
-    _outputDir = "nord-stream-logs"
+    _outputDir = OUTPUT_DIR
     _sleepTime = 15
     _maxRetry = 10
     _isGHSToken = False

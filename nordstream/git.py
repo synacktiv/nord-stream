@@ -1,5 +1,6 @@
 import subprocess
 from nordstream.utils.log import logger
+from nordstream.utils.constants import *
 
 """
 TODO: find an alternative to subprocess it's a bit crappy.
@@ -8,11 +9,11 @@ TODO: find an alternative to subprocess it's a bit crappy.
 
 class Git:
 
-    USER = "nord-stream"
-    EMAIL = "nord-stream@localhost.com"
+    USER = GIT_USER
+    EMAIL = GIT_EMAIL
     KEY_ID = None
-    ATTACK_COMMIT_MSG = "Test deployment"
-    CLEAN_COMMIT_MSG = "Remove test deployment"
+    ATTACK_COMMIT_MSG = GIT_ATTACK_COMMIT_MSG
+    CLEAN_COMMIT_MSG = GIT_CLEAN_COMMIT_MSG
 
     @staticmethod
     def gitRunCommand(command):

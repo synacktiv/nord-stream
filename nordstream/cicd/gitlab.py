@@ -4,22 +4,21 @@ from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
+from nordstream.utils.constants import *
 import urllib3
-
-COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 
 # painfull warnings you know what you are doing right ?
 requests.packages.urllib3.disable_warnings()
 
 
 class GitLab:
-    _DEFAULT_BRANCH_NAME = "dev_remote_ea5Eu/test/v1"
+    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
     _auth = None
     _session = None
     _token = None
     _projects = []
     _groups = []
-    _outputDir = "nord-stream-logs"
+    _outputDir = OUTPUT_DIR
     _header = None
     _gitlabURL = None
     _verifyCert = True
@@ -32,7 +31,7 @@ class GitLab:
         self._token = token
         self._header = {
             "PRIVATE-TOKEN": token,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+            "User-Agent": USER_AGENT,
         }
         self._verifyCert = verifCert
         self._session = requests.Session()
