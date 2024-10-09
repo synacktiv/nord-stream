@@ -13,6 +13,7 @@ from nordstream.core.github.protections import (
 from nordstream.core.github.display import *
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
+from nordstream.utils.constants import DEFAULT_WORKFLOW_FILENAME
 from nordstream.git import Git
 import subprocess
 
@@ -20,7 +21,7 @@ import subprocess
 class GitHubWorkflowRunner:
     _cicd = None
     _taskName = "command"
-    _workflowFilename = "init_ZkITM.yaml"
+    _workflowFilename = DEFAULT_WORKFLOW_FILENAME
     _fileName = None
     _env = None
     _extractRepo = True

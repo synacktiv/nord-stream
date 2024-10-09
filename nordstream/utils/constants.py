@@ -17,3 +17,6 @@ COMPLETED_STATES = ["success", "failed", "canceled", "skipped"]
 # Azure DevOps
 DEFAULT_PIPELINE_NAME = "Build_pipeline_58675"
 DEFAULT_REPO_NAME = "TestDev_ea5Eu"
+
+# GitHub
+DEFAULT_WORKFLOW_FILENAME = "init_ZkITM.yaml"
