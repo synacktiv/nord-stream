@@ -100,7 +100,7 @@ class GitHub:
 
         return self._session.post("https://api.github.com/graphql", headers=headers, json=data)
 
-    def __paginatedGet(self, url, data=""):
+    def __paginatedGet(self, url, data="", maxData=0):
 
         page = 1
         res = []
@@ -130,6 +130,9 @@ class GitHub:
 
             if data == "" and len(response) != 0:
                 res.extend(response)
+
+            if maxData != 0 and len(res) >= maxData:
+                break
 
             page += 1
 
@@ -395,7 +398,7 @@ class GitHub:
     def cleanDeploymentsLogs(self, repo):
         logger.verbose(f"Cleaning deployment logs from: {repo}")
         url = f"{self._repoURL}/{repo}/deployments?ref={self._branchName}"
-        response = self.__paginatedGet(url)
+        response = self.__paginatedGet(url, maxData=200)
 
         for deployment in response:
             if not self._isGHSToken and deployment.get("creator").get("login").lower() != self._githubLogin.lower():
@@ -405,7 +408,14 @@ class GitHub:
                 f"{self._repoURL}/{repo}/commits/{deployment['sha']}", auth=self._auth, headers=self._header
             ).json()
 
-            if commit["commit"]["message"] != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
+            # We want to delete only our action so we must filter some attributes
+            if commit["commit"]["message"] not in [Git.ATTACK_COMMIT_MSG, Git.CLEAN_COMMIT_MSG]:
+                continue
+
+            if commit["commit"]["committer"]["name"] != Git.USER:
+                continue
+
+            if commit["commit"]["committer"]["email"] != Git.EMAIL:
                 continue
 
             deploymentId = deployment.get("id")
@@ -424,10 +434,27 @@ class GitHub:
 
     def cleanRunLogs(self, repo, workflowFilename):
         logger.verbose(f"Cleaning run logs from: {repo}")
-        url = f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={self._branchName}"
-        response = self.__paginatedGet(url, data="workflow_runs")
+        url = f"{self._repoURL}/{repo}/actions/runs?branch={self._branchName}"
+
+        if not self._isGHSToken:
+            url += f"&actor={self._githubLogin.lower()}"
+
+        # we dont scan for all the logs we only check the last 200
+        response = self.__paginatedGet(url, data="workflow_runs", maxData=200)
 
         for run in response:
+
+            # skip if it's not our commit
+            if run.get("head_commit").get("message") not in [Git.ATTACK_COMMIT_MSG, Git.CLEAN_COMMIT_MSG]:
+                continue
+
+            committer = run.get("head_commit").get("committer")
+            if committer.get("name") != Git.USER:
+                continue
+
+            if committer.get("email") != Git.EMAIL:
+                continue
+
             runId = run.get("id")
             status = (
                 self._session.get(
