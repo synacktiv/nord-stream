@@ -54,8 +54,8 @@ class Git:
         cls.gitRunCommand("git rm . -rf")
         cls.gitRunCommand("git rm .github/ -rf")
 
-        fileName = randomString(5) + "_test_dev.txt"
         if leaveOneFile:
+            fileName = randomString(5) + "_test_dev.txt"
             cls.gitRunCommand(f"echo {fileName} > {fileName}")
             cls.gitRunCommand(f"git add -A")
 

@@ -318,7 +318,7 @@ class GitHub:
     def disableBranchProtectionRules(self, repo):
         logger.debug("Modifying branch protection")
         response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{self._branchName}",
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -333,7 +333,7 @@ class GitHub:
                 "allow_force_pushes": True,
             }
             self._session.put(
-                f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
+                f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
                 json=data,
                 auth=self._auth,
                 headers=self._header,
@@ -364,7 +364,7 @@ class GitHub:
 
     def checkBranchProtectionRules(self, repo):
         response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{self._branchName}",
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -375,7 +375,7 @@ class GitHub:
     def getBranchesProtectionRules(self, repo):
         logger.debug("Getting branch protection rules")
         response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -387,7 +387,7 @@ class GitHub:
         logger.debug("Updating branch protection rules")
 
         response = self._session.put(
-            f"{self._repoURL}/{repo}/branches/{self._branchName}/protection",
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
             auth=self._auth,
             headers=self._header,
             json=protections,
@@ -397,7 +397,7 @@ class GitHub:
 
     def cleanDeploymentsLogs(self, repo):
         logger.verbose(f"Cleaning deployment logs from: {repo}")
-        url = f"{self._repoURL}/{repo}/deployments?ref={self._branchName}"
+        url = f"{self._repoURL}/{repo}/deployments?ref={urllib.parse.quote(self._branchName)}"
         response = self.__paginatedGet(url, maxData=200)
 
         for deployment in response:
@@ -434,7 +434,7 @@ class GitHub:
 
     def cleanRunLogs(self, repo, workflowFilename):
         logger.verbose(f"Cleaning run logs from: {repo}")
-        url = f"{self._repoURL}/{repo}/actions/runs?branch={self._branchName}"
+        url = f"{self._repoURL}/{repo}/actions/runs?branch={urllib.parse.quote(self._branchName)}"
 
         if not self._isGHSToken:
             url += f"&actor={self._githubLogin.lower()}"
@@ -526,7 +526,7 @@ class GitHub:
         time.sleep(5)
         workflowFilename = urllib.parse.quote_plus(workflowFilename)
         response = self._session.get(
-            f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={self._branchName}",
+            f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -536,7 +536,7 @@ class GitHub:
                 logger.warning(f"Workflow not started, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
                 response = self._session.get(
-                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={self._branchName}",
+                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
                     auth=self._auth,
                     headers=self._header,
                 ).json()
@@ -551,7 +551,7 @@ class GitHub:
                 logger.warning(f"Workflow not finished, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
                 response = self._session.get(
-                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={self._branchName}",
+                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
                     auth=self._auth,
                     headers=self._header,
                 ).json()
