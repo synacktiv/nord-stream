@@ -511,7 +511,7 @@ class DevOpsRunner:
             self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
     def __pushEmptyFile(self):
-        Git.gitCreateEmptyFile("README.md")
+        Git.gitCreateDummyFile("README.md")
 
         pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()

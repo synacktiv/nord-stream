@@ -1,6 +1,7 @@
 import subprocess
 from nordstream.utils.log import logger
 from nordstream.utils.constants import *
+from nordstream.utils.helpers import randomString
 
 """
 TODO: find an alternative to subprocess it's a bit crappy.
@@ -53,8 +54,9 @@ class Git:
         cls.gitRunCommand("git rm . -rf")
         cls.gitRunCommand("git rm .github/ -rf")
 
+        fileName = randomString(5) + "_test_dev.txt"
         if leaveOneFile:
-            cls.gitRunCommand(f"touch test_dev.txt")
+            cls.gitRunCommand(f"echo {fileName} > {fileName}")
             cls.gitRunCommand(f"git add -A")
 
         cls.gitRunCommand(f"git commit -m '{cls.CLEAN_COMMIT_MSG}'")
@@ -109,8 +111,8 @@ class Git:
         )
 
     @classmethod
-    def gitCreateEmptyFile(cls, file):
-        cls.gitRunCommand(f"touch {file}")
+    def gitCreateDummyFile(cls, file):
+        cls.gitRunCommand(f"echo '{file}' > {file}")
 
     @classmethod
     def gitMvFile(cls, src, dest):

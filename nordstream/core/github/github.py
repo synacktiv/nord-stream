@@ -13,6 +13,7 @@ from nordstream.core.github.protections import (
 from nordstream.core.github.display import *
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
+from nordstream.utils.helpers import randomString
 from nordstream.utils.constants import DEFAULT_WORKFLOW_FILENAME
 from nordstream.git import Git
 import subprocess
@@ -707,7 +708,8 @@ class GitHubWorkflowRunner:
             pass
 
         if not protectionEnabled:
-            Git.gitCreateEmptyFile("test_push.md")
+            fileName = randomString(5) + "_test_push.md"
+            Git.gitCreateDummyFile(fileName)
             pushOutput = Git.gitPush(self._cicd.branchName)
             pushOutput.wait()
 
