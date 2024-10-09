@@ -3,7 +3,7 @@ import base64
 import glob
 from zipfile import ZipFile
 from os import makedirs, chdir
-from os.path import exists, realpath
+from os.path import exists, realpath, basename
 from nordstream.yaml.github import WorkflowGenerator
 from nordstream.core.github.protections import (
     resetRequiredStatusCheck,
@@ -522,6 +522,8 @@ class GitHubWorkflowRunner:
 
         workflowGenerator = WorkflowGenerator()
         workflowGenerator.loadFile(self._yaml)
+
+        self._workflowFilename = basename(self._yaml)
 
         if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "custom", self._env):
             self.__displayCustomWorkflowOutput(repo)
