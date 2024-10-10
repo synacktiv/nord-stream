@@ -5,6 +5,7 @@ from zipfile import ZipFile
 from os import makedirs, chdir
 from os.path import exists, realpath, basename
 from nordstream.yaml.github import WorkflowGenerator
+from nordstream.yaml.custom import CustomGenerator
 from nordstream.core.github.protections import (
     resetRequiredStatusCheck,
     resetRequiredPullRequestReviews,
@@ -520,7 +521,7 @@ class GitHubWorkflowRunner:
     def __runCustomWorkflow(self, repo):
         logger.info(f"Running custom workflow: {self._yaml}")
 
-        workflowGenerator = WorkflowGenerator()
+        workflowGenerator = CustomGenerator()
         workflowGenerator.loadFile(self._yaml)
 
         self._workflowFilename = basename(self._yaml)
