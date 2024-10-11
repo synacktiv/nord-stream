@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
+    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter --sleep <seconds>]
     nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
     nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
@@ -39,6 +39,7 @@ args:
     --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
     --describe-token                        Display information on the token
+    --sleep <seconds>                       Time to sleep in seconds between each secret request.
 
 Examples:
     Dump all secrets
@@ -101,6 +102,8 @@ def start(argv):
         gitLabRunner.cleanLogs = not args["--no-clean"]
     if args["--yaml"]:
         gitLabRunner.yaml = args["--yaml"]
+    if args["--sleep"]:
+        gitLabRunner.sleepTime = args["--sleep"]
 
     # logic
     if args["--describe-token"]:

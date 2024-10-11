@@ -6,6 +6,7 @@ from os.path import exists, realpath
 from nordstream.utils.log import logger
 from nordstream.git import Git
 import subprocess
+import time
 from nordstream.utils.errors import GitLabError
 from nordstream.yaml.gitlab import GitLabPipelineGenerator
 
@@ -20,6 +21,7 @@ class GitLabRunner:
     _branchAlreadyExists = False
     _fileName = None
     _cleanLogs = True
+    _sleepTime = 0
 
     @property
     def writeAccessFilter(self):
@@ -76,6 +78,14 @@ class GitLabRunner:
     @cleanLogs.setter
     def cleanLogs(self, value):
         self._cleanLogs = value
+
+    @property
+    def sleepTime(self):
+        return self._sleepTime
+
+    @sleepTime.setter
+    def sleepTime(self, value):
+        self._sleepTime = value
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -141,6 +151,7 @@ class GitLabRunner:
         res = False
         for project in self._cicd.projects:
             try:
+                time.sleep(self._sleepTime)
                 res |= self.__displayProjectVariables(project)
             except Exception as e:
                 logger.error(f"Error while listing secrets for {project.get('name')}: {e}")
@@ -150,6 +161,7 @@ class GitLabRunner:
         res = False
         for project in self._cicd.projects:
             try:
+                time.sleep(self._sleepTime)
                 res |= self.__displayProjectSecureFiles(project)
             except Exception as e:
                 logger.error(f"Error while listing secure files for {project.get('name')}: {e}")
@@ -159,6 +171,7 @@ class GitLabRunner:
         res = False
         for group in self._cicd.groups:
             try:
+                time.sleep(self._sleepTime)
                 res |= self.__displayGroupVariables(group)
             except Exception as e:
                 logger.error(f"Error while listing secrets for {group.get('name')}: {e}")
