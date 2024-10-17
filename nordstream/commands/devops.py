@@ -16,6 +16,7 @@ Options:
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
+    --ignore-cert                           Allow insecure server connections
 
 Commit:
     --user <user>                           User used to commit
@@ -75,11 +76,11 @@ def start(argv):
 
     logger.debug(args)
     # check validity of the token
-    if not DevOps.checkToken(args["--token"], args["--org"]):
+    if not DevOps.checkToken(args["--token"], args["--org"], (not args["--ignore-cert"])):
         logger.critical("Invalid token or org.")
 
     # devops setup
-    devops = DevOps(args["--token"], args["--org"])
+    devops = DevOps(args["--token"], args["--org"], (not args["--ignore-cert"]))
     if args["--output-dir"]:
         devops.outputDir = args["--output-dir"] + "/"
     if args["--branch-name"]:

@@ -6,6 +6,10 @@ from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.git import Git
 from nordstream.utils.errors import DevOpsError
 from nordstream.utils.constants import *
+from nordstream.utils.helpers import isAZDOBearerToken
+
+# painfull warnings you know what you are doing right ?
+requests.packages.urllib3.disable_warnings()
 
 
 class DevOps:
@@ -28,14 +32,14 @@ class DevOps:
     _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
     _maxRetry = 10
-    _verifyCert = True
 
-    def __init__(self, token, org):
+    def __init__(self, token, org, verifCert):
         self._token = token
         self._org = org
         self._baseURL += f"{org}/"
-        self._auth = ("", self._token)
         self._session = requests.Session()
+        self.setCookiesAndHeaders()
+        self._session.verify = verifCert
         self._devopsLoginId = self.__getLogin()
 
     @property
@@ -97,10 +101,14 @@ class DevOps:
         logger.debug("Retrieving user informations")
         return self._session.get(
             f"{self._baseURL}/_apis/ConnectionData",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
+
+    def setCookiesAndHeaders(self):
+        if isAZDOBearerToken(self._token):
+            self._session.headers.update({"Authorization": f"Bearer {self._token}"})
+        else:
+            self._session.auth = ("", self._token)
+        self._session.headers.update(self._header)
 
     def listProjects(self):
         logger.debug("Listing projects")
@@ -111,8 +119,6 @@ class DevOps:
             response = self._session.get(
                 f"{self._baseURL}/_apis/projects",
                 params=params,
-                auth=self._auth,
-                headers=self._header,
                 verify=self._verifyCert,
             ).json()
 
@@ -136,9 +142,6 @@ class DevOps:
             response = self._session.get(
                 f"https://vssps.dev.azure.com/{self._org}/_apis/graph/groups",
                 params=params,
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
             )
 
             headers = response.headers
@@ -184,9 +187,6 @@ class DevOps:
                     response = self._session.get(
                         f"https://vsaex.dev.azure.com/{self._org}/_apis/GroupEntitlements/{originId}/members",
                         params=params,
-                        auth=self._auth,
-                        headers=self._header,
-                        verify=self._verifyCert,
                     ).json()
 
                     pagingToken = response.get("continuationToken")
@@ -202,9 +202,6 @@ class DevOps:
         logger.debug("Listing repositories")
         response = self._session.get(
             f"{self._baseURL}/{project}/_apis/git/repositories",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
         return response.get("value")
 
@@ -212,9 +209,6 @@ class DevOps:
         logger.debug("Listing pipelines")
         response = self._session.get(
             f"{self._baseURL}/{project}/_apis/pipelines",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
         return response.get("value")
 
@@ -223,9 +217,6 @@ class DevOps:
 
         response = self._session.get(
             f"{self._baseURL}/_apis/projects/{project}",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
 
         if response.get("id"):
@@ -233,14 +224,14 @@ class DevOps:
             self._projects.append(p)
 
     @classmethod
-    def checkToken(cls, token, org):
+    def checkToken(cls, token, org, verifCert):
         logger.verbose(f"Checking token: {token}")
         try:
             return (
                 requests.get(
                     f"https://dev.azure.com/{org}/_apis/ConnectionData",
                     auth=("foo", token),
-                    verify=cls._verifyCert,
+                    verify=verifCert,
                 ).status_code
                 == 200
             )
@@ -252,9 +243,6 @@ class DevOps:
         logger.debug(f"Listing variable groups for: {project}")
         response = self._session.get(
             f"{self._baseURL}/{project}/_apis/distributedtask/variablegroups",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         )
 
         if response.status_code != 200:
@@ -278,9 +266,6 @@ class DevOps:
         logger.debug(f"Listing secure files for: {project}")
         response = self._session.get(
             f"{self._baseURL}/{project}/_apis/distributedtask/securefiles",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         )
 
         if response.status_code != 200:
@@ -301,9 +286,6 @@ class DevOps:
         logger.debug(f"Checking current pipeline permissions for: \"{resource['name']}\"")
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/pipelines/pipelinePermissions/{resourceType}/{resourceId}",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
 
         allPipelines = response.get("allPipelines")
@@ -317,9 +299,6 @@ class DevOps:
         logger.debug(f"\"{resource['name']}\" has restricted permissions. Adding access permissions for the pipeline")
         response = self._session.patch(
             f"{self._baseURL}/{projectId}/_apis/pipelines/pipelinePermissions/{resourceType}/{resourceId}",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
             json={"pipelines": [{"id": pipelineId, "authorized": True}]},
         )
 
@@ -334,9 +313,6 @@ class DevOps:
         response = self._session.post(
             f"{self._baseURL}/{project}/_apis/git/repositories",
             json=data,
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
 
         return response
@@ -345,9 +321,6 @@ class DevOps:
         logger.debug(f"Deleting git repo for: {project}")
         response = self._session.delete(
             f"{self._baseURL}/{project}/_apis/git/repositories/{repoId}",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         )
         return response.status_code == 204
 
@@ -369,9 +342,6 @@ class DevOps:
         response = self._session.post(
             f"{self._baseURL}/{project}/_apis/pipelines",
             json=data,
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
         return response.get("id")
 
@@ -385,9 +355,6 @@ class DevOps:
         response = self._session.post(
             f"{self._baseURL}/{project}/_apis/build/Builds",
             json=params,
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
 
         return response
@@ -398,9 +365,6 @@ class DevOps:
         return (
             self._session.get(
                 f"{self._baseURL}/{project}/_apis/build/Builds",
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
             )
             .json()
             .get("value")
@@ -410,9 +374,6 @@ class DevOps:
 
         return self._session.get(
             f"{self._baseURL}/{project}/_apis/build/Builds/{buildId}/sources",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
 
     def getRunId(self, project, pipelineId):
@@ -455,9 +416,6 @@ class DevOps:
             response = self._session.get(
                 f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}",
                 json={},
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
             ).json()
 
             if response.get("state") == "completed":
@@ -482,9 +440,6 @@ class DevOps:
             buildTimeline = self._session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
                 json={},
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
             ).json()
 
             logs = [
@@ -518,9 +473,6 @@ class DevOps:
             logOutput = self._session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
                 json={},
-                auth=self._auth,
-                headers=self._header,
-                verify=self._verifyCert,
             ).json()
             if len(logOutput.get("value")) != 0:
                 break
@@ -554,9 +506,6 @@ class DevOps:
 
                 self._session.delete(
                     f"{self._baseURL}/{projectId}/_apis/build/builds/{buildId}",
-                    auth=self._auth,
-                    headers=self._header,
-                    verify=self._verifyCert,
                 )
 
     def __cleanPipeline(self, projectId):
@@ -564,9 +513,6 @@ class DevOps:
 
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/pipelines",
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
         if response.get("count", 0) != 0:
             for pipeline in response.get("value"):
@@ -574,9 +520,6 @@ class DevOps:
                     pipelineId = pipeline.get("id")
                     self._session.delete(
                         f"{self._baseURL}/{projectId}/_apis/pipelines/{pipelineId}",
-                        auth=self._auth,
-                        headers=self._header,
-                        verify=self._verifyCert,
                     )
 
     def deletePipeline(self, projectId):
@@ -584,9 +527,6 @@ class DevOps:
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/build/Definitions",
             json={},
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         ).json()
         if response.get("count", 0) != 0:
             for pipeline in response.get("value"):
@@ -595,9 +535,6 @@ class DevOps:
                     self._session.delete(
                         f"{self._baseURL}/{projectId}/_apis/build/definitions/{definitionId}",
                         json={},
-                        auth=self._auth,
-                        headers=self._header,
-                        verify=self._verifyCert,
                     )
 
     def cleanAllLogs(self, projectId):
@@ -609,9 +546,6 @@ class DevOps:
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/serviceendpoint/endpoints",
             json={},
-            auth=self._auth,
-            headers=self._header,
-            verify=self._verifyCert,
         )
 
         if response.status_code != 200:
@@ -628,8 +562,6 @@ class DevOps:
 
         response = self._session.get(
             f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}",
-            auth=self._auth,
-            headers=self._header,
         ).json()
         for result in response.get("validationResults"):
             res.append(result.get("message"))
@@ -637,8 +569,6 @@ class DevOps:
         try:
             timeline = self._session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/Timeline",
-                auth=self._auth,
-                headers=self._header,
             ).json()
             for record in timeline.get("records", []):
                 if record.get("issues"):

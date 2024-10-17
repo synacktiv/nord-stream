@@ -6,7 +6,6 @@ from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
 from nordstream.utils.constants import *
 from nordstream.utils.helpers import isGitLabSessionCookie
-import urllib3
 
 # painfull warnings you know what you are doing right ?
 requests.packages.urllib3.disable_warnings()
