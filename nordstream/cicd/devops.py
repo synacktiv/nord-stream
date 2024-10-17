@@ -119,7 +119,6 @@ class DevOps:
             response = self._session.get(
                 f"{self._baseURL}/_apis/projects",
                 params=params,
-                verify=self._verifyCert,
             ).json()
 
             if len(response.get("value")) != 0:

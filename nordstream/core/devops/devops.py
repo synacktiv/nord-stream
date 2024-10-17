@@ -203,6 +203,7 @@ class DevOpsRunner:
             self._extractAzureServiceconnections
             or self._extractGitHubServiceconnections
             or self._extractAWSServiceconnections
+            or self._extractSonarServiceconnections
         ):
 
             try:
