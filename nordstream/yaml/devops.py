@@ -1,8 +1,9 @@
 from nordstream.yaml.generator import YamlGeneratorBase
+from nordstream.utils.constants import DEFAULT_TASK_NAME
 
 
 class DevOpsPipelineGenerator(YamlGeneratorBase):
-    taskName = "Task fWQf8"
+    taskName = DEFAULT_TASK_NAME
     _defaultTemplate = {
         "pool": {"vmImage": "ubuntu-latest"},
         "steps": [
@@ -100,6 +101,25 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         "trigger": "none",
     }
 
+    _serviceConnectionTemplateSonar = {
+        "pool": {"vmImage": "ubuntu-latest"},
+        "steps": [
+            {
+                "task": "SonarQubePrepare@6",
+                "inputs": {"SonarQube": "#FIXME", "scannerMode": "CLI", "projectKey": "sonarqube"},
+            },
+            {
+                "task": "Bash@3",
+                "displayName": taskName,
+                "inputs": {
+                    "targetType": "inline",
+                    "script": "sh -c 'env | grep SONARQUBE_SCANNER_PARAMS | base64 -w0 | base64 -w0; echo ;'",
+                },
+            },
+        ],
+        "trigger": "none",
+    }
+
     def generatePipelineForSecretExtraction(self, variableGroup):
         self.addVariableGroupToYaml(variableGroup.get("name"))
         self.addSecretsToYaml(variableGroup.get("variables"))
@@ -120,6 +140,10 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         self._defaultTemplate = self._serviceConnectionTemplateAWS
         # self.__setAWSRegion(regionName)
         self.__setAWSCredential(awsCredentials)
+
+    def generatePipelineForSonar(self, sonarSCName):
+        self._defaultTemplate = self._serviceConnectionTemplateSonar
+        self.__setSonarServiceConnectionName(sonarSCName)
 
     def addVariableGroupToYaml(self, variableGroupName):
         self._defaultTemplate.get("variables")[0]["group"] = variableGroupName
@@ -145,3 +169,6 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
 
     def __setAWSCredential(self, awsCredentials):
         self._defaultTemplate.get("steps")[0].get("inputs")["awsCredentials"] = awsCredentials
+
+    def __setSonarServiceConnectionName(self, scName):
+        self._defaultTemplate.get("steps")[0].get("inputs")["SonarQube"] = scName

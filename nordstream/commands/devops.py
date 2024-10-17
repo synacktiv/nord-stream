@@ -2,7 +2,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --no-aws --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream.py devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
     nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
@@ -29,20 +29,23 @@ args:
     -y, --yaml <yaml>                       Run arbitrary job
     --clean-logs                            Delete all pipeline created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
+    --list-projects                         List all projects.
+    --list-secrets                          List all secrets.
+    --write-filter                          Filter projects where current user has write or admin access.
+    --build-yaml <output>                   Create a pipeline yaml file with default configuration.
+    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws, sonar
+    --describe-token                        Display information on the token
+    --branch-name <name>                    Use specific branch name for deployment.
+    --pipeline-name <name>                  Use pipeline for deployment.
+    --repo-name <name>                      Use specific repo for deployment.
+
+Exctraction:
     --no-vg                                 Don't extract variable groups secrets
     --no-sf                                 Don't extract secure files
     --no-gh                                 Don't extract GitHub service connection secrets
     --no-az                                 Don't extract Azure service connection secrets
     --no-aws                                Don't extract AWS service connection secrets
-    --list-projects                         List all projects.
-    --list-secrets                          List all secrets.
-    --write-filter                          Filter projects where current user has write or admin access.
-    --build-yaml <output>                   Create a pipeline yaml file with default configuration.
-    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws
-    --describe-token                        Display information on the token
-    --branch-name <name>                    Use specific branch name for deployment.
-    --pipeline-name <name>                  Use pipeline for deployment.
-    --repo-name <name>                      Use specific repo for deployment.
+    --no-sonar                              Don't extract Sonar service connection secrets
 
 Examples:
     List all secrets from all projects
@@ -110,6 +113,8 @@ def start(argv):
         devopsRunner.extractGitHubServiceconnections = not args["--no-gh"]
     if args["--no-aws"]:
         devopsRunner.extractAWSServiceconnections = not args["--no-aws"]
+    if args["--no-sonar"]:
+        devopsRunner.extractSonarerviceconnections = not args["--no-sonar"]
     if args["--no-clean"]:
         devopsRunner.cleanLogs = not args["--no-clean"]
 

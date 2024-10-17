@@ -18,6 +18,7 @@ class DevOpsRunner:
     _extractAzureServiceconnections = True
     _extractGitHubServiceconnections = True
     _extractAWSServiceconnections = True
+    _extractSonarServiceconnections = True
     _yaml = None
     _writeAccessFilter = False
     _pipelineFilename = "azure-pipelines.yml"
@@ -26,7 +27,7 @@ class DevOpsRunner:
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
     _pushedCommitsCount = 0
     _branchAlreadyExists = False
-    _allowedTypes = ["azurerm", "github", "aws"]
+    _allowedTypes = ["azurerm", "github", "aws", "sonarqube"]
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -71,6 +72,14 @@ class DevOpsRunner:
     @extractAWSServiceconnections.setter
     def extractAWSServiceconnections(self, value):
         self._extractAWSServiceconnections = value
+
+    @property
+    def extractSonarerviceconnections(self):
+        return self._extractSonarServiceconnections
+
+    @extractSonarerviceconnections.setter
+    def extractSonarerviceconnections(self, value):
+        self._extractSonarServiceconnections = value
 
     @property
     def output(self):
@@ -228,6 +237,8 @@ class DevOpsRunner:
             pipelineGenerator.generatePipelineForAzureRm("#FIXME")
         elif pipelineType == "aws":
             pipelineGenerator.generatePipelineForAWS("#FIXME")
+        elif pipelineType == "sonar":
+            pipelineGenerator.generatePipelineForSonar("#FIXME")
         else:
             pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
 
@@ -464,6 +475,21 @@ class DevOpsRunner:
         else:
             logger.error(f"Unsupported scheme: {scheme}")
 
+    def __extractSonarSecrets(self, projectId, pipelineId, sc):
+        endpoint = sc.get("name")
+
+        pipelineGenerator = DevOpsPipelineGenerator()
+        pipelineGenerator.generatePipelineForSonar(endpoint)
+
+        logger.info(f'Extracting secrets for Sonar: "{endpoint}"')
+        runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+        if runId:
+            self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+            if self._fileName:
+                self.__extractPipelineOutput(projectId, self._resType["doubleb64"])
+
+        logger.empty_line()
+
     def __extractServiceConnectionsSecrets(self, projectId, pipelineId):
 
         try:
@@ -488,6 +514,8 @@ class DevOpsRunner:
                         self.__extractGitHubSecrets(projectId, pipelineId, sc)
                     elif self._extractAWSServiceconnections and scType == "aws":
                         self.__extractAWSSecrets(projectId, pipelineId, sc)
+                    elif self._extractSonarServiceconnections and scType == "sonarqube":
+                        self.__extractSonarSecrets(projectId, pipelineId, sc)
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")
@@ -507,6 +535,7 @@ class DevOpsRunner:
             self._extractAzureServiceconnections
             or self._extractGitHubServiceconnections
             or self._extractAWSServiceconnections
+            or self._extractSonarServiceconnections
         ):
             self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
