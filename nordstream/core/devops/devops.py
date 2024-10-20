@@ -7,6 +7,7 @@ from os.path import exists, realpath
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.utils.errors import GitError, RepoCreationError, DevOpsError
 from nordstream.utils.log import logger
+from nordstream.utils.helpers import isAllowed
 from nordstream.git import Git
 import subprocess
 
@@ -19,6 +20,7 @@ class DevOpsRunner:
     _extractGitHubServiceconnections = True
     _extractAWSServiceconnections = True
     _extractSonarServiceconnections = True
+    _extractSSHServiceConnections = True
     _yaml = None
     _writeAccessFilter = False
     _pipelineFilename = "azure-pipelines.yml"
@@ -27,7 +29,7 @@ class DevOpsRunner:
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
     _pushedCommitsCount = 0
     _branchAlreadyExists = False
-    _allowedTypes = ["azurerm", "github", "aws", "sonarqube"]
+    _allowedTypes = ["azurerm", "github", "aws", "sonarqube", "ssh"]
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -82,6 +84,14 @@ class DevOpsRunner:
         self._extractSonarServiceconnections = value
 
     @property
+    def extractSSHServiceConnections(self):
+        return self._extractSSHServiceConnections
+
+    @extractSSHServiceConnections.setter
+    def extractSSHServiceConnections(self, value):
+        self._extractSSHServiceConnections = value
+
+    @property
     def output(self):
         return self._output
 
@@ -122,6 +132,20 @@ class DevOpsRunner:
         for p in self._cicd.projects:
             name = p.get("name")
             logger.raw(f"- {name}\n", level=logging.INFO)
+
+    def listDevOpsUsers(self):
+        logger.info("Listing all users:")
+        for p in self._cicd.listUsers():
+            origin = p.get("origin")
+            displayName = p.get("displayName")
+            mailAddress = p.get("mailAddress")
+            res = f"- {displayName}"
+
+            if mailAddress != "":
+                res += f" / {mailAddress}"
+
+            res += f" ({origin})\n"
+            logger.raw(res, level=logging.INFO)
 
     def getProjects(self, project):
         if project:
@@ -204,6 +228,7 @@ class DevOpsRunner:
             or self._extractGitHubServiceconnections
             or self._extractAWSServiceconnections
             or self._extractSonarServiceconnections
+            or self._extractSSHServiceConnections
         ):
 
             try:
@@ -240,6 +265,8 @@ class DevOpsRunner:
             pipelineGenerator.generatePipelineForAWS("#FIXME")
         elif pipelineType == "sonar":
             pipelineGenerator.generatePipelineForSonar("#FIXME")
+        elif pipelineType == "ssh":
+            pipelineGenerator.generatePipelineForSSH("#FIXME")
         else:
             pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
 
@@ -491,6 +518,21 @@ class DevOpsRunner:
 
         logger.empty_line()
 
+    def __extractSSHSecrets(self, projectId, pipelineId, sc):
+        endpoint = sc.get("name")
+
+        pipelineGenerator = DevOpsPipelineGenerator()
+        pipelineGenerator.generatePipelineForSSH(endpoint)
+
+        logger.info(f'Extracting secrets for ssh: "{endpoint}"')
+        runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
+        if runId:
+            self._fileName = self._cicd.downloadPipelineOutput(projectId, runId)
+            if self._fileName:
+                self.__extractPipelineOutput(projectId, self._resType["doubleb64"])
+
+        logger.empty_line()
+
     def __extractServiceConnectionsSecrets(self, projectId, pipelineId):
 
         try:
@@ -517,6 +559,8 @@ class DevOpsRunner:
                         self.__extractAWSSecrets(projectId, pipelineId, sc)
                     elif self._extractSonarServiceconnections and scType == "sonarqube":
                         self.__extractSonarSecrets(projectId, pipelineId, sc)
+                    elif self._extractSSHServiceConnections and scType == "ssh":
+                        self.__extractSSHSecrets(projectId, pipelineId, sc)
 
     def manualCleanLogs(self):
         logger.info("Deleting logs")
@@ -537,6 +581,7 @@ class DevOpsRunner:
             or self._extractGitHubServiceconnections
             or self._extractAWSServiceconnections
             or self._extractSonarServiceconnections
+            or self._extractSSHServiceConnections
         ):
             self.__extractServiceConnectionsSecrets(projectId, pipelineId)
 
@@ -725,3 +770,15 @@ class DevOpsRunner:
                     msg += res.get("message", "") + "\n"
 
             raise DevOpsError(msg)
+
+    def parseExtractList(self, extractList, allow=True):
+
+        extractList = extractList.split(",") if extractList else []
+
+        self._extractVariableGroups = isAllowed("vg", extractList, allow)
+        self._extractSecureFiles = isAllowed("sf", extractList, allow)
+        self._extractAzureServiceconnections = isAllowed("vg", extractList, allow)
+        self._extractGitHubServiceconnections = isAllowed("az", extractList, allow)
+        self._extractAWSServiceconnections = isAllowed("aws", extractList, allow)
+        self._extractSonarServiceconnections = isAllowed("sonar", extractList, allow)
+        self._extractSSHServiceConnections = isAllowed("ssh", extractList, allow)

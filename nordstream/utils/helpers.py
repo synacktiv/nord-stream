@@ -17,3 +17,10 @@ def isAZDOBearerToken(s):
 def randomString(length):
     letters = string.ascii_lowercase
     return "".join(random.choice(letters) for i in range(length))
+
+
+def isAllowed(value, sclist, allow=True):
+    if allow:
+        return value in sclist
+    else:
+        return not value in sclist

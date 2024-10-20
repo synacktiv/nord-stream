@@ -129,6 +129,38 @@ class DevOps:
             else:
                 break
 
+    def listUsers(self):
+        logger.debug("Listing users")
+        continuationToken = None
+        res = []
+        params = {}
+        # Azure DevOps pagination
+        while True:
+            if continuationToken:
+                params = {"continuationToken": continuationToken}
+            response = self._session.get(
+                f"https://vssps.dev.azure.com/{self._org}/_apis/graph/users",
+                params=params,
+            )
+
+            headers = response.headers
+            response = response.json()
+
+            if len(response.get("value")) != 0:
+                for user in response.get("value"):
+                    p = {
+                        "origin": user.get("origin"),
+                        "displayName": user.get("displayName"),
+                        "mailAddress": user.get("mailAddress"),
+                    }
+                    res.append(p)
+                continuationToken = headers.get("x-ms-continuationtoken", None)
+                if not continuationToken:
+                    break
+            else:
+                break
+        return res
+
     # TODO: crappy code I know
     def filterWriteProjects(self):
         continuationToken = None

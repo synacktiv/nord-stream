@@ -7,7 +7,7 @@ Usage:
     nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
-    nord-stream.py devops [options] --token <pat> --org <org> --list-secrets [--project <project> --write-filter]
+    nord-stream.py devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
     nord-stream.py devops [options] --token <pat> --org <org> --describe-token
 
 Options:
@@ -24,7 +24,7 @@ Commit:
     --key-id <id>                           GPG primary key ID to sign commits
 
 args:
-    --token <pat>                           Azure DevOps personal token
+    --token <pat>                           Azure DevOps personal token or JWT
     --org <org>                             Org name
     -p, --project <project>                 Run on selected project (can be a file)
     -y, --yaml <yaml>                       Run arbitrary job
@@ -32,21 +32,18 @@ args:
     --no-clean                              Don't clean pipeline logs (default false)
     --list-projects                         List all projects.
     --list-secrets                          List all secrets.
+    --list-users                            List all users.
     --write-filter                          Filter projects where current user has write or admin access.
     --build-yaml <output>                   Create a pipeline yaml file with default configuration.
-    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws, sonar
+    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws, sonar, ssh
     --describe-token                        Display information on the token
     --branch-name <name>                    Use specific branch name for deployment.
     --pipeline-name <name>                  Use pipeline for deployment.
     --repo-name <name>                      Use specific repo for deployment.
 
 Exctraction:
-    --no-vg                                 Don't extract variable groups secrets
-    --no-sf                                 Don't extract secure files
-    --no-gh                                 Don't extract GitHub service connection secrets
-    --no-az                                 Don't extract Azure service connection secrets
-    --no-aws                                Don't extract AWS service connection secrets
-    --no-sonar                              Don't extract Sonar service connection secrets
+    --extract <list>                        Extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
+    --no-extract <list>                     Don't extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
 
 Examples:
     List all secrets from all projects
@@ -104,18 +101,15 @@ def start(argv):
     if args["--write-filter"]:
         devopsRunner.writeAccessFilter = args["--write-filter"]
 
-    if args["--no-vg"]:
-        devopsRunner.extractVariableGroups = not args["--no-vg"]
-    if args["--no-sf"]:
-        devopsRunner.extractSecureFiles = not args["--no-sf"]
-    if args["--no-az"]:
-        devopsRunner.extractAzureServiceconnections = not args["--no-az"]
-    if args["--no-gh"]:
-        devopsRunner.extractGitHubServiceconnections = not args["--no-gh"]
-    if args["--no-aws"]:
-        devopsRunner.extractAWSServiceconnections = not args["--no-aws"]
-    if args["--no-sonar"]:
-        devopsRunner.extractSonarerviceconnections = not args["--no-sonar"]
+    if args["--extract"] and args["--no-extract"]:
+        logger.critical("Can't use both --service-connection and --no-service-connection option.")
+
+    if args["--extract"]:
+        devopsRunner.parseExtractList(args["--extract"])
+
+    if args["--no-extract"]:
+        devopsRunner.parseExtractList(args["--no-extract"], False)
+
     if args["--no-clean"]:
         devopsRunner.cleanLogs = not args["--no-clean"]
 
@@ -128,6 +122,9 @@ def start(argv):
     # logic
     if args["--list-projects"]:
         devopsRunner.listDevOpsProjects()
+
+    if args["--list-users"]:
+        devopsRunner.listDevOpsUsers()
 
     elif args["--list-secrets"]:
         devopsRunner.listProjectSecrets()
