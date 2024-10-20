@@ -131,7 +131,7 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
             },
             {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
             {
-                "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''",
+                "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''; rm /tmp/artefacts.tar.gz",
                 "displayName": taskName,
             },
         ],
