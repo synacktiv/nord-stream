@@ -129,7 +129,11 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                 "script": 'SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js) ; cp $SSH_FILE $SSH_FILE.bak ; sed -i \'s|const readyTimeout = getReadyTimeoutVariable();|const readyTimeout = getReadyTimeoutVariable();\\nconst fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("/tmp/artefacts.tar.gz", data, (err) => {});|\' $SSH_FILE',
                 "displayName": f"Preparing {taskName}",
             },
-            {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
+            {
+                "task": "SSH@0",
+                "continueOnError": True,
+                "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"},
+            },
             {
                 "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''; rm /tmp/artefacts.tar.gz",
                 "displayName": taskName,
@@ -148,12 +152,13 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
                     "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; copy $p $p+".bak"; (Get-Content -Path $p -Raw) -replace [regex]::Escape(\'const readyTimeout = getReadyTimeoutVariable();\'), \'const readyTimeout = getReadyTimeoutVariable();const fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("artefacts.tar.gz", data, (err) => {});\' | Set-Content -Path $p }',
                     "targetType": "inline",
                 },
+                "continueOnError": True,
             },
             {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
             {
                 "task": "PowerShell@2",
                 "inputs": {
-                    "script": '$encodedOnce = [Convert]::ToBase64String([IO.File]::ReadAllBytes("artefacts.tar.gz"));$encodedTwice = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($encodedOnce));echo $encodedTwice; echo \'\'; rm artefacts.tar.gz; Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; mv -force $p+".bak" $p ;}',
+                    "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; mv -force $p+".bak" $p ;}; $encodedOnce = [Convert]::ToBase64String([IO.File]::ReadAllBytes("artefacts.tar.gz"));$encodedTwice = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($encodedOnce));echo $encodedTwice; echo \'\'; rm artefacts.tar.gz;',
                     "targetType": "inline",
                 },
                 "displayName": taskName,
