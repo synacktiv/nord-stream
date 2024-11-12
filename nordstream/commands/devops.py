@@ -123,7 +123,7 @@ def start(argv):
     if args["--list-projects"]:
         devopsRunner.listDevOpsProjects()
 
-    if args["--list-users"]:
+    elif args["--list-users"]:
         devopsRunner.listDevOpsUsers()
 
     elif args["--list-secrets"]:
