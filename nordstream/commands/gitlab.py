@@ -3,8 +3,8 @@ CICD pipeline exploitation tool
 
 Usage:
     nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter --sleep <seconds>]
-    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
+    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects | --list-users) [--project <project> --group <group> --write-filter]
+    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--project-path <path> --no-clean]
     nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream.py gitlab [options] --token <pat> --describe-token
 
@@ -30,6 +30,7 @@ args:
     --list-protections                      List branch protection rules.
     --list-projects                         List all projects.
     --list-groups                           List all groups.
+    --list-users                            List all users.
     --write-filter                          Filter repo where current user has developer access or more.
     --no-project                            Don't extract project secrets.
     --no-group                              Don't extract group secrets.
@@ -40,6 +41,7 @@ args:
     --no-clean                              Don't clean pipeline logs (default false)
     --describe-token                        Display information on the token
     --sleep <seconds>                       Time to sleep in seconds between each secret request.
+    --project-path <path>                   Local path of the git folder.
 
 Examples:
     Dump all secrets
@@ -104,6 +106,8 @@ def start(argv):
         gitLabRunner.yaml = args["--yaml"]
     if args["--sleep"]:
         gitLabRunner.sleepTime = args["--sleep"]
+    if args["--project-path"]:
+        gitLabRunner.localPath = args["--project-path"]
 
     # logic
     if args["--describe-token"]:
@@ -120,6 +124,9 @@ def start(argv):
     elif args["--list-groups"]:
         gitLabRunner.getGroups(args["--group"])
         gitLabRunner.listGitLabGroups()
+
+    elif args["--list-users"]:
+        gitLabRunner.listGitLabUsers()
 
     elif args["--list-secrets"]:
         if gitLabRunner.extractProject:

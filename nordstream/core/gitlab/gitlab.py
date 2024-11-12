@@ -22,6 +22,7 @@ class GitLabRunner:
     _fileName = None
     _cleanLogs = True
     _sleepTime = 0
+    _localPath = None
 
     @property
     def writeAccessFilter(self):
@@ -86,6 +87,17 @@ class GitLabRunner:
     @sleepTime.setter
     def sleepTime(self, value):
         self._sleepTime = value
+
+    @property
+    def localPath(self):
+        return self._localPath
+
+    @localPath.setter
+    def localPath(self, value):
+        if exists(value):
+            self._localPath = value
+        else:
+            logger.critical("Invalid local project path.")
 
     def __init__(self, cicd):
         self._cicd = cicd
@@ -272,6 +284,23 @@ class GitLabRunner:
             else:
                 logger.raw(f'- {project["path_with_namespace"]}\n', level=logging.INFO)
 
+    def listGitLabUsers(self):
+        logger.info("Listing GitLab users")
+        for user in self._cicd.listUsers():
+            id = user.get("id")
+            username = user.get("username")
+            email = user.get("email")
+            is_admin = user.get("is_admin")
+
+            res = f"- {id} {username}"
+            if email != None:
+                res += f" {email}"
+
+            if is_admin != None:
+                res += f"(is_admin: {is_admin})"
+
+            logger.raw(f"{res}\n", level=logging.INFO)
+
     def listGitLabGroups(self):
         logger.info("Listing GitLab groups")
         for project in self._cicd.groups:
@@ -288,14 +317,18 @@ class GitLabRunner:
             else:
                 logger.success(f'"{repoName}"')
 
-            domain = urlparse(self._cicd.url).netloc
-            if self._cicd.url.startswith("https"):
-                handler = "https"
-            else:
-                handler = "http"
+            if self._localPath == None:
+                domain = urlparse(self._cicd.url).netloc
+                if self._cicd.url.startswith("https"):
+                    handler = "https"
+                else:
+                    handler = "http"
 
-            url = f"{handler}://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
-            Git.gitClone(url)
+                url = f"{handler}://foo:{self._cicd.token}@{domain}/{project.get('path_with_namespace')}"
+                Git.gitClone(url)
+
+            else:
+                repoPath = self._localPath
 
             chdir(repoPath)
             self._pushedCommitsCount = 0

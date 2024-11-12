@@ -299,6 +299,30 @@ class GitLab:
             logger.error("Error while retrieving groups")
             logger.debug(response)
 
+    def listUsers(self):
+        logger.debug(f"Listing users.")
+        res = []
+
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/users")
+
+        if status_code == 200:
+            if len(response) == 0:
+                return
+
+            for p in response:
+                u = {
+                    "id": p.get("id"),
+                    "username": p.get("username"),
+                    "email": p.get("email"),
+                    "is_admin": p.get("is_admin"),
+                }
+                res.append(u)
+
+        else:
+            logger.error("Error while retrieving groups")
+            logger.debug(response)
+        return res
+
     def __createOutputDir(self, name):
         # outputName = name.replace("/", "_")
         path = f"{self._outputDir}/{name}"
@@ -411,7 +435,7 @@ class GitLab:
                     f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/commits/{commitId}"
                 ).json()
 
-                if response.get("title") != (Git.ATTACK_COMMIT_MSG and Git.CLEAN_COMMIT_MSG):
+                if response.get("title") not in [Git.ATTACK_COMMIT_MSG, Git.CLEAN_COMMIT_MSG]:
                     continue
 
                 if response.get("author_name") != Git.USER:
