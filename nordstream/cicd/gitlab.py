@@ -1,5 +1,6 @@
 import requests
 import time
+import re
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
@@ -424,6 +425,18 @@ class GitLab:
             f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
         )
 
+        headers = {}
+
+        # Get CSRF token when using session cookie otherwise we can't delete a pipeline
+        if isGitLabSessionCookie(self._token):
+
+            html_content = self._session.get(f"{self._gitlabURL}/").text
+            pattern = r'<meta name="csrf-token" content="([^"]+)"'
+            match = re.search(pattern, html_content)
+            csrf_token = match.group(1)
+
+            headers["x-csrf-token"] = csrf_token
+
         for pipeline in response:
 
             # additional checks for non default branches
@@ -442,7 +455,13 @@ class GitLab:
                     continue
 
             pipelineId = pipeline.get("id")
-            response = self._session.delete(f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}")
+            graphQL = {
+                "operationName": "deletePipeline",
+                "variables": {"id": f"gid://gitlab/Ci::Pipeline/{pipelineId}"},
+                "query": "mutation deletePipeline($id: CiPipelineID!) {\n  pipelineDestroy(input: {id: $id}) {\n    errors\n    __typename\n  }\n}\n",
+            }
+
+            response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL, headers=headers)
 
     def cleanAllLogs(self, projectId):
         # deleting the pipeline removes everything
