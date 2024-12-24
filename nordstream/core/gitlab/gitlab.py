@@ -210,6 +210,18 @@ class GitLabRunner:
                     logger.raw(
                         f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
                     )
+   
+            variables_inherited = self._cicd.listInheritedVariablesFromProject(project)
+            if len(variables_inherited) != 0:
+
+                logger.info(f'"{projectName}" inherited group variables')
+
+                for variable in variables_inherited:
+                    logger.raw(
+                        f'\t- {variable["key"]}={variable["value"]} (group: {variable["group"]}, protected:{variable["protected"]})\n', logging.INFO
+                    )
+
+            if (len(variables) > 0) or (len(variables_inherited) > 0):
                 return True
         except GitLabError as e:
             if logger.getEffectiveLevel() < logging.INFO:

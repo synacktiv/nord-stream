@@ -161,6 +161,44 @@ class GitLab:
             raise GitLabError(response.get("message"))
         return res
 
+    def listInheritedVariablesFromProject(self, project):
+        id = project.get("id")
+        res = []
+
+        graphQL = {
+            "operationName": "getInheritedCiVariables",
+            "variables": {
+                "first": 100,
+                "fullPath": project.get("path_with_namespace")
+            },
+            "query": """
+                query getInheritedCiVariables($after: String, $first: Int, $fullPath: ID!) {
+                    project(fullPath: $fullPath) {
+                        inheritedCiVariables(after: $after, first: $first) {
+                            nodes {
+                                key
+                                groupName
+                                masked
+                                hidden
+                                protected
+                                raw
+                            }  
+                        }
+                    }
+                }
+            """
+        }
+
+        response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL)
+        
+        if response.status_code == 200 and len(response.text) > 0:
+            nodes = response.json().get('data', {}).get('project', {}).get('inheritedCiVariables', {}).get('nodes', [])
+            for variable in nodes:
+                res.append({"key": variable["key"], "value": variable["raw"], "group": variable["groupName"], "protected": variable["protected"]})
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
+        return res
+
     def listSecureFilesFromProject(self, project):
         logger.debug("Getting project secure files")
         id = project.get("id")
