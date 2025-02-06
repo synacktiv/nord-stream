@@ -240,10 +240,13 @@ class GitLab:
             raise GitLabError(response.get("message"))
         return res
 
-    def addProject(self, project=None, filterWrite=False, strict=False):
+    def addProject(self, project=None, filterWrite=False, strict=False, membership=False):
         logger.debug(f"Checking project: {project}")
 
         params = {}
+
+        if membership:
+            params["membership"] = True
 
         if project != None:
             params["search_namespaces"] = True
@@ -252,7 +255,12 @@ class GitLab:
         if filterWrite:
             params["min_access_level"] = 30
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects", params)
+        if not (project and project.isnumeric()):
+            status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects", params)
+        else:
+            response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{project}")
+            status_code = response.status_code
+            response = [response.json()]
 
         if status_code == 200:
             if len(response) == 0:

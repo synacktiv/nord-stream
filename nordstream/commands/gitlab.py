@@ -16,6 +16,7 @@ Options:
     --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
     --ignore-cert                           Allow insecure server connections
+    --membership                            Limit by projects that the current user is a member of
 
 Commit:
     --user <user>                           User used to commit
@@ -24,7 +25,7 @@ Commit:
 
 args:
     --token <pat>                           GitLab personal access token or _gitlab_session cookie
-    --project <project>                     Run on selected project (can be a file)
+    --project <project>                     Run on selected project (can be a file / project id)
     --group <group>                         Run on selected group (can be a file)
     --list-secrets                          List all secrets.
     --list-protections                      List branch protection rules.
@@ -114,11 +115,11 @@ def start(argv):
         gitLabRunner.describeToken()
 
     elif args["--list-projects"]:
-        gitLabRunner.getProjects(args["--project"])
+        gitLabRunner.getProjects(args["--project"], membership=args["--membership"])
         gitLabRunner.listGitLabProjects()
 
     elif args["--list-protections"]:
-        gitLabRunner.getProjects(args["--project"])
+        gitLabRunner.getProjects(args["--project"], membership=args["--membership"])
         gitLabRunner.listBranchesProtectionRules()
 
     elif args["--list-groups"]:
@@ -130,16 +131,16 @@ def start(argv):
 
     elif args["--list-secrets"]:
         if gitLabRunner.extractProject:
-            gitLabRunner.getProjects(args["--project"])
+            gitLabRunner.getProjects(args["--project"], membership=args["--membership"])
         if gitLabRunner.extractGroup:
             gitLabRunner.getGroups(args["--group"])
 
         gitLabRunner.listGitLabSecrets()
 
     elif args["--clean-logs"]:
-        gitLabRunner.getProjects(args["--project"])
+        gitLabRunner.getProjects(args["--project"], membership=args["--membership"])
         gitLabRunner.manualCleanLogs()
 
     else:
-        gitLabRunner.getProjects(args["--project"], strict=True)
+        gitLabRunner.getProjects(args["--project"], strict=True, membership=args["--membership"])
         gitLabRunner.runPipeline()

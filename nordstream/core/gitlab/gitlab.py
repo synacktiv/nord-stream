@@ -107,17 +107,21 @@ class GitLabRunner:
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/gitlab"
         makedirs(self._cicd.outputDir, exist_ok=True)
 
-    def getProjects(self, project, strict=False):
+    def getProjects(self, project, strict=False, membership=False):
         if project:
             if exists(project):
                 with open(project, "r") as file:
                     for p in file:
-                        self._cicd.addProject(project=p.strip(), filterWrite=self._writeAccessFilter, strict=strict)
+                        self._cicd.addProject(
+                            project=p.strip(), filterWrite=self._writeAccessFilter, strict=strict, membership=membership
+                        )
 
             else:
-                self._cicd.addProject(project=project, filterWrite=self._writeAccessFilter, strict=strict)
+                self._cicd.addProject(
+                    project=project, filterWrite=self._writeAccessFilter, strict=strict, membership=membership
+                )
         else:
-            self._cicd.addProject(filterWrite=self._writeAccessFilter)
+            self._cicd.addProject(filterWrite=self._writeAccessFilter, membership=membership)
 
         if len(self._cicd.projects) == 0:
             if self._writeAccessFilter:
