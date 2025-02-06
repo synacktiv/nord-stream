@@ -142,7 +142,7 @@ class GitLabRunner:
             self._cicd.addGroups()
 
         if len(self._cicd.groups) == 0:
-            logger.critical("No group found.")
+            logger.error("No group found.")
 
     def listGitLabSecrets(self):
         logger.info("Listing GitLab secrets")
