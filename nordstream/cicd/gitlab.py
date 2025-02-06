@@ -154,7 +154,7 @@ class GitLab:
             for variable in response:
                 secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
 
-                if variable["hidden"]:
+                if variable["hidden"] != None:
                     secret["hidden"] = variable["hidden"]
                 else:
                     secret["hidden"] = "N/A"
@@ -210,7 +210,7 @@ class GitLab:
                     "protected": variable["protected"],
                 }
 
-                if variable["hidden"]:
+                if variable["hidden"] != None:
                     secret["hidden"] = variable["hidden"]
                 else:
                     secret["hidden"] = "N/A"
@@ -277,7 +277,7 @@ class GitLab:
             for variable in response:
                 secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
 
-                if variable["hidden"]:
+                if variable["hidden"] != None:
                     secret["hidden"] = variable["hidden"]
                 else:
                     secret["hidden"] = "N/A"
@@ -304,7 +304,7 @@ class GitLab:
             for variable in response:
                 secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
 
-                if variable["hidden"]:
+                if variable["hidden"] != None:
                     secret["hidden"] = variable["hidden"]
                 else:
                     secret["hidden"] = "N/A"
