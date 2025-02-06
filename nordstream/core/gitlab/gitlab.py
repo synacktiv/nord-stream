@@ -212,9 +212,10 @@ class GitLabRunner:
 
                 for variable in variables:
                     logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
+                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
+                        logging.INFO,
                     )
-   
+
             variables_inherited = self._cicd.listInheritedVariablesFromProject(project)
             if len(variables_inherited) != 0:
 
@@ -222,7 +223,8 @@ class GitLabRunner:
 
                 for variable in variables_inherited:
                     logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (group: {variable["group"]}, protected:{variable["protected"]})\n', logging.INFO
+                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
+                        logging.INFO,
                     )
 
             if (len(variables) > 0) or (len(variables_inherited) > 0):
@@ -263,7 +265,8 @@ class GitLabRunner:
 
                 for variable in variables:
                     logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
+                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
+                        logging.INFO,
                     )
                 return True
         except GitLabError as e:
@@ -279,7 +282,8 @@ class GitLabRunner:
                 logger.info("Instance variables:")
                 for variable in variables:
                     logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]})\n', logging.INFO
+                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
+                        logging.INFO,
                     )
                 return True
         except GitLabError as e:

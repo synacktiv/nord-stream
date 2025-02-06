@@ -152,7 +152,14 @@ class GitLab:
             f = open(f"{path}/secrets.txt", "w")
 
             for variable in response:
-                res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
+
+                if variable["hidden"]:
+                    secret["hidden"] = variable["hidden"]
+                else:
+                    secret["hidden"] = "N/A"
+
+                res.append(secret)
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
@@ -167,10 +174,7 @@ class GitLab:
 
         graphQL = {
             "operationName": "getInheritedCiVariables",
-            "variables": {
-                "first": 100,
-                "fullPath": project.get("path_with_namespace")
-            },
+            "variables": {"first": 100, "fullPath": project.get("path_with_namespace")},
             "query": """
                 query getInheritedCiVariables($after: String, $first: Int, $fullPath: ID!) {
                     project(fullPath: $fullPath) {
@@ -182,20 +186,42 @@ class GitLab:
                                 hidden
                                 protected
                                 raw
-                            }  
+                            }
                         }
                     }
                 }
-            """
+            """,
         }
 
         response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL)
-        
+
         if response.status_code == 200 and len(response.text) > 0:
-            nodes = response.json().get('data', {}).get('project', {}).get('inheritedCiVariables', {}).get('nodes', [])
+            path = self.__createOutputDir(project.get("path_with_namespace"))
+
+            f = open(f"{path}/secrets.txt", "w")
+
+            nodes = response.json().get("data", {}).get("project", {}).get("inheritedCiVariables", {}).get("nodes", [])
             for variable in nodes:
-                res.append({"key": variable["key"], "value": variable["raw"], "group": variable["groupName"], "protected": variable["protected"]})
-        elif status_code == 403:
+
+                secret = {
+                    "key": variable["key"],
+                    "value": variable["raw"],
+                    "group": variable["groupName"],
+                    "protected": variable["protected"],
+                }
+
+                if variable["hidden"]:
+                    secret["hidden"] = variable["hidden"]
+                else:
+                    secret["hidden"] = "N/A"
+
+                res.append(secret)
+
+                f.write(f"{variable['key']}={variable['value']}\n")
+
+            f.close()
+
+        elif response.status_code == 403:
             raise GitLabError(response.get("message"))
         return res
 
@@ -249,7 +275,14 @@ class GitLab:
             f = open(f"{path}/secrets.txt", "w")
 
             for variable in response:
-                res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
+
+                if variable["hidden"]:
+                    secret["hidden"] = variable["hidden"]
+                else:
+                    secret["hidden"] = "N/A"
+
+                res.append(secret)
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
@@ -269,7 +302,14 @@ class GitLab:
             f = open(f"{path}/secrets.txt", "w")
 
             for variable in response:
-                res.append({"key": variable["key"], "value": variable["value"], "protected": variable["protected"]})
+                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
+
+                if variable["hidden"]:
+                    secret["hidden"] = variable["hidden"]
+                else:
+                    secret["hidden"] = "N/A"
+
+                res.append(secret)
 
                 f.write(f"{variable['key']}={variable['value']}\n")
 
