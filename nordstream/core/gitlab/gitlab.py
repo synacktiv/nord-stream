@@ -298,11 +298,12 @@ class GitLabRunner:
 
             repoPath = project.get("path")
             repoName = project.get("name")
+            repoId = project.get("id")
 
             if repoPath != repoName:
-                logger.raw(f'- {project["path_with_namespace"]} ({repoName})\n', level=logging.INFO)
+                logger.raw(f'- {project["path_with_namespace"]} / {repoId} ({repoName})\n', level=logging.INFO)
             else:
-                logger.raw(f'- {project["path_with_namespace"]}\n', level=logging.INFO)
+                logger.raw(f'- {project["path_with_namespace"]} / {repoId}\n', level=logging.INFO)
 
     def listGitLabUsers(self):
         logger.info("Listing GitLab users")
