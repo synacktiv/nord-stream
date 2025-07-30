@@ -133,6 +133,14 @@ class DevOpsRunner:
             name = p.get("name")
             logger.raw(f"- {name}\n", level=logging.INFO)
 
+    def listDevOpsRepositories(self):
+        logger.info("Listing all repositories:")
+        for p in self._cicd.projects:
+            project_name = p.get("name")
+            for r in self._cicd.listRepositories(project_name):
+                name = r.get("name")
+                logger.raw(f"- {project_name}/{name}\n", level=logging.INFO)
+
     def listDevOpsUsers(self):
         logger.info("Listing all users:")
         for p in self._cicd.listUsers():

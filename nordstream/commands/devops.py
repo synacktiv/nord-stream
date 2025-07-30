@@ -31,6 +31,7 @@ args:
     --clean-logs                            Delete all pipeline created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
     --list-projects                         List all projects.
+    --list-repositories                     List all repositories.
     --list-secrets                          List all secrets.
     --list-users                            List all users.
     --write-filter                          Filter projects where current user has write or admin access.
@@ -122,6 +123,9 @@ def start(argv):
     # logic
     if args["--list-projects"]:
         devopsRunner.listDevOpsProjects()
+
+    elif args["--list-repositories"]:
+        devopsRunner.listDevOpsRepositories()
 
     elif args["--list-users"]:
         devopsRunner.listDevOpsUsers()
