@@ -2,13 +2,14 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
-    nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
-    nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
-    nord-stream.py devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
-    nord-stream.py devops [options] --token <pat> --org <org> --describe-token
+    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
+    nord-stream devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
+    nord-stream devops [options] --token <pat> --org <org> --list-projects [--write-filter]
+    nord-stream devops [options] --token <pat> --org <org> --list-repositories [--project <project>]
+    nord-stream devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
+    nord-stream devops [options] --token <pat> --org <org> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -48,10 +49,10 @@ Exctraction:
 
 Examples:
     List all secrets from all projects
-    $ nord-stream.py devops --token "$PAT" --org myorg --list-secrets
+    $ nord-stream devops --token "$PAT" --org myorg --list-secrets
 
     Dump all secrets from all projects
-    $ nord-stream.py devops --token "$PAT" --org myorg
+    $ nord-stream devops --token "$PAT" --org myorg
 
 Authors: @hugow @0hexit
 """

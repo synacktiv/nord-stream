@@ -2,11 +2,11 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter --sleep <seconds>]
-    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects | --list-users) [--project <project> --group <group> --write-filter]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--project-path <path> --no-clean]
-    nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
-    nord-stream.py gitlab [options] --token <pat> --describe-token
+    nord-stream gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter --sleep <seconds>]
+    nord-stream gitlab [options] --token <pat> ( --list-groups | --list-projects | --list-users) [--project <project> --group <group> --write-filter]
+    nord-stream gitlab [options] --token <pat> --yaml <yaml> --project <project> [--project-path <path> --no-clean]
+    nord-stream gitlab [options] --token <pat> --clean-logs [--project <project>]
+    nord-stream gitlab [options] --token <pat> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -46,10 +46,10 @@ args:
 
 Examples:
     Dump all secrets
-    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
+    $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
 
     Deploy the custom pipeline on the master branch
-    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
+    $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
 
 Authors: @hugow @0hexit
 """

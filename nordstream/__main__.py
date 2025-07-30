@@ -3,7 +3,7 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py <command> [<args>...]
+    nord-stream <command> [<args>...]
 
 Commands
     github                                  command related to GitHub.
@@ -21,7 +21,7 @@ from docopt import docopt
 from nordstream.utils.log import logger
 
 
-if __name__ == "__main__":
+def main():
     args = docopt(__doc__, version="0.1", options_first=True)
 
     argv = [args["<command>"]] + args["<args>"]
@@ -39,4 +39,7 @@ if __name__ == "__main__":
 
         gitlab.start(argv)
     else:
-        logger.error(f"{args['<command>']} is not a nord-stream.py command.")
+        logger.error(f"{args['<command>']} is not a nord-stream command.")
+
+if __name__ == "__main__":
+    main()

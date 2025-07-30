@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nord-stream"
+version = "0.1.0"
+description = "CICD secrets exfiltration tool"
+authors = [{ name="@hugow" }, { name="@0hexit"}]
+license = { text = "GPL-3.0" }
+dependencies = ["docopt", "PyYAML", "requests", "rich"]
+
+[project.scripts]
+nord-stream = "nordstream.__main__:main"
