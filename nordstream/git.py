@@ -115,6 +115,15 @@ class Git:
         cls.gitRunCommand(f"echo '{file}' > {file}")
 
     @classmethod
+    def gitDiffFile(cls, file):
+        return subprocess.Popen(
+            f"git diff HEAD -- {file}",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+    @classmethod
     def gitMvFile(cls, src, dest):
         cls.gitRunCommand(f"mv {src} {dest}")
 

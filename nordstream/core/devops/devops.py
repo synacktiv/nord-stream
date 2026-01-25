@@ -595,6 +595,13 @@ class DevOpsRunner:
 
     def __pushEmptyFile(self):
         Git.gitCreateDummyFile("README.md")
+        diffOutput = Git.gitDiffFile("README.md")
+        stdout, stderr = diffOutput.communicate()
+        if stdout == b'':
+            logger.info(f"README.md file not modified.")
+        else:
+            logger.info(f"README.md file is modified, incrementing commit count.")
+            self._pushedCommitsCount += 1
 
         pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
