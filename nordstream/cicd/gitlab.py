@@ -139,6 +139,50 @@ class GitLab:
 
         return response.status_code, res
 
+    def listRunnersFromProject(self, project):
+        id = project.get("id")
+        res = []
+
+        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/jobs")
+
+        if status_code == 200 and len(response) > 0:
+            for job in response:
+
+                if not job.get("runner") or not job.get("runner_manager"):
+                    continue
+
+                # Get executor from job trace
+                executor = "unknown"
+                response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{id}/jobs/{job['id']}/trace")
+                if response.status_code == 200 and len(response.text) > 0:
+                    regex = r'Preparing the "([^"]+)" executor'
+                    match = re.search(r'Preparing the "([^"]+)" executor', response.text)
+                    if match:
+                        executor = match.group(1)
+
+                _runner = job["runner"]
+                _manager = job["runner_manager"]
+                res.append({
+                    "id": f"{_runner['id']}/{_manager['system_id']}",
+                    "status": _manager["status"],
+                    "contacted_at": _manager["contacted_at"],
+                    "runner_type": _runner["runner_type"],
+                    "access_level": "unknown",
+                    "executor": executor,
+                    "description": _runner["description"],
+                    "platform": _manager["platform"],
+                    "architecture": _manager["architecture"],
+                    "ip_address": _manager["ip_address"],
+                    "version": _manager["version"],
+                    "projects": [project["path_with_namespace"]],
+                    "tags": job["tag_list"],
+                })
+
+        elif status_code == 403:
+            raise GitLabError(response.get("message"))
+
+        return res
+
     def listVariablesFromProject(self, project):
         id = project.get("id")
         res = []
