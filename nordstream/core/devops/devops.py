@@ -1,15 +1,15 @@
-import logging
 import base64
-import time
-
-from os import makedirs, chdir
-from os.path import exists, realpath
-from nordstream.yaml.devops import DevOpsPipelineGenerator
-from nordstream.utils.errors import GitError, RepoCreationError, DevOpsError
-from nordstream.utils.log import logger
-from nordstream.utils.helpers import isAllowed
-from nordstream.git import Git
+import logging
 import subprocess
+import time
+from os import chdir, makedirs
+from os.path import exists, realpath
+
+from nordstream.git import Git
+from nordstream.utils.errors import DevOpsError, GitError, RepoCreationError
+from nordstream.utils.helpers import isAllowed
+from nordstream.utils.log import logger
+from nordstream.yaml.devops import DevOpsPipelineGenerator
 
 
 class DevOpsRunner:
@@ -114,6 +114,14 @@ class DevOpsRunner:
     @yaml.setter
     def yaml(self, value):
         self._yaml = realpath(value)
+
+    @property
+    def pipelineFilename(self):
+        return self._pipelineFilename
+
+    @pipelineFilename.setter
+    def pipelineFilename(self, value):
+        self._pipelineFilename = value
 
     @property
     def writeAccessFilter(self):
@@ -597,7 +605,7 @@ class DevOpsRunner:
         Git.gitCreateDummyFile("README.md")
         diffOutput = Git.gitDiffFile("README.md")
         stdout, stderr = diffOutput.communicate()
-        if stdout == b'':
+        if stdout == b"":
             logger.info(f"README.md file not modified.")
         else:
             logger.info(f"README.md file is modified, incrementing commit count.")
