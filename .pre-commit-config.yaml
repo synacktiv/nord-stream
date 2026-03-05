@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -17,7 +17,7 @@ repos:
           - --markdown-linebreak-ext=md
 
   - repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 26.1.0
     hooks:
       - id: black
         language_version: python3
@@ -25,8 +25,8 @@ repos:
           - --line-length=120
 
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v2.1.1
+    rev: v4.4.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
-        args: [build, chore, ci, docs, style, refactor, perf, test]
+        args: [build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test]
