@@ -41,5 +41,6 @@ def main():
     else:
         logger.error(f"{args['<command>']} is not a nord-stream command.")
 
+
 if __name__ == "__main__":
     main()

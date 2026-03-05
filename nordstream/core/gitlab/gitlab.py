@@ -153,9 +153,7 @@ class GitLabRunner:
             res |= self.__listGitLabProjectRunners()
 
         if not res:
-            logger.warning(
-                "You don't have access to any runner or job"
-            )
+            logger.warning("You don't have access to any runner or job")
 
     def __mergeLists(self, current, new, key):
         current[key] = list(set(current[key] + new[key]))
@@ -182,30 +180,18 @@ class GitLabRunner:
 
         for runner in runners:
             res = True
-            logger.info(f'{runner["id"]} (scope: {runner["runner_type"].replace("_type", "")}, executor: {runner["executor"]}, accesslevel: {runner["access_level"]})')
-            logger.raw(
-                f'    - status: {runner["status"].lower()} (lastseen: {runner["contacted_at"]})\n',
-                logging.INFO)
-            logger.raw(
-                f'    - description: {runner["description"] or "n/a"}\n',
-                logging.INFO)
-            logger.raw(
-                f'    - tags: {runner["tags"]}\n',
-                logging.INFO)
-            logger.raw(
-                f'    - platform: {runner["platform"]} ({runner["architecture"]})\n',
-                logging.INFO)
-            logger.raw(
-                f'    - ipaddress: {runner["ip_address"]}\n',
-                logging.INFO)
+            logger.info(
+                f'{runner["id"]} (scope: {runner["runner_type"].replace("_type", "")}, executor: {runner["executor"]}, accesslevel: {runner["access_level"]})'
+            )
+            logger.raw(f'    - status: {runner["status"].lower()} (lastseen: {runner["contacted_at"]})\n', logging.INFO)
+            logger.raw(f'    - description: {runner["description"] or "n/a"}\n', logging.INFO)
+            logger.raw(f'    - tags: {runner["tags"]}\n', logging.INFO)
+            logger.raw(f'    - platform: {runner["platform"]} ({runner["architecture"]})\n', logging.INFO)
+            logger.raw(f'    - ipaddress: {runner["ip_address"]}\n', logging.INFO)
             if runner["projects"]:
-                logger.raw(
-                    f'    - projects:\n',
-                    logging.INFO)
+                logger.raw(f"    - projects:\n", logging.INFO)
                 for project in runner["projects"]:
-                    logger.raw(
-                        f'      - {project}\n',
-                        logging.INFO)
+                    logger.raw(f"      - {project}\n", logging.INFO)
 
         return res
 

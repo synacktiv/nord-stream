@@ -162,21 +162,23 @@ class GitLab:
 
                 _runner = job["runner"]
                 _manager = job["runner_manager"]
-                res.append({
-                    "id": f"{_runner['id']}/{_manager['system_id']}",
-                    "status": _manager["status"],
-                    "contacted_at": _manager["contacted_at"],
-                    "runner_type": _runner["runner_type"],
-                    "access_level": "unknown",
-                    "executor": executor,
-                    "description": _runner["description"],
-                    "platform": _manager["platform"],
-                    "architecture": _manager["architecture"],
-                    "ip_address": _manager["ip_address"],
-                    "version": _manager["version"],
-                    "projects": [project["path_with_namespace"]],
-                    "tags": job["tag_list"],
-                })
+                res.append(
+                    {
+                        "id": f"{_runner['id']}/{_manager['system_id']}",
+                        "status": _manager["status"],
+                        "contacted_at": _manager["contacted_at"],
+                        "runner_type": _runner["runner_type"],
+                        "access_level": "unknown",
+                        "executor": executor,
+                        "description": _runner["description"],
+                        "platform": _manager["platform"],
+                        "architecture": _manager["architecture"],
+                        "ip_address": _manager["ip_address"],
+                        "version": _manager["version"],
+                        "projects": [project["path_with_namespace"]],
+                        "tags": job["tag_list"],
+                    }
+                )
 
         elif status_code == 403:
             raise GitLabError(response.get("message"))

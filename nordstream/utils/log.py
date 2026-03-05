@@ -9,6 +9,7 @@ from typing import Any, cast
 from rich.console import Console
 from rich.logging import RichHandler
 
+
 # Blablabla "roll your own logging handler"
 # https://github.com/Textualize/rich/issues/2647#issuecomment-1335017733
 class WhitespaceStrippingConsole(Console):
