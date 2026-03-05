@@ -1,6 +1,7 @@
 import requests
 import time
 import re
+import sys
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
@@ -95,8 +96,9 @@ class GitLab:
                 ).status_code
                 == 200
             )
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(e)
+            sys.exit(1)
         return False
 
     def __getLogin(self):
@@ -104,7 +106,7 @@ class GitLab:
         return response.get("username", "")
 
     def getUser(self):
-        logger.debug(f"Retrieving user informations")
+        logger.debug(f"Retrieving user information")
 
         return self._session.get(f"{self._gitlabURL}/api/v4/user").json()
 
@@ -125,6 +127,7 @@ class GitLab:
 
             params["page"] = i
 
+            logger.debug(f"Paginated GET request to {url} with parameters {params}")
             response = self._session.get(url, params=params)
 
             if response.status_code == 200:
@@ -364,9 +367,7 @@ class GitLab:
             raise GitLabError(response.get("message"))
         return res
 
-    def addProject(self, project=None, filterWrite=False, strict=False, membership=False):
-        logger.debug(f"Checking project: {project}")
-
+    def addProjects(self, project=None, filterWrite=False, strict=False, membership=False):
         params = {}
 
         if membership:
@@ -402,12 +403,10 @@ class GitLab:
                 self._projects.append(p)
 
         else:
-            logger.error("Error while retrieving projects")
+            logger.error(f"Error while retrieving {f'project: {project}' if project is not None else 'projects'}")
             logger.debug(response)
 
     def addGroups(self, group=None):
-        logger.debug(f"Checking group: {group}")
-
         params = {"all_available": True}
 
         if group != None:
@@ -452,7 +451,7 @@ class GitLab:
                 res.append(u)
 
         else:
-            logger.error("Error while retrieving groups")
+            logger.error("Error while retrieving users")
             logger.debug(response)
         return res
 

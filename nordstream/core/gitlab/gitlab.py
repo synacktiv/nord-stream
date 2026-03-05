@@ -111,18 +111,21 @@ class GitLabRunner:
     def getProjects(self, project, strict=False, membership=False):
         if project:
             if exists(project):
+                logger.info(f"Getting GitLab projects of a file: {project}")
                 with open(project, "r") as file:
                     for p in file:
-                        self._cicd.addProject(
+                        self._cicd.addProjects(
                             project=p.strip(), filterWrite=self._writeAccessFilter, strict=strict, membership=membership
                         )
 
             else:
-                self._cicd.addProject(
+                logger.info(f"Getting GitLab project: {project}")
+                self._cicd.addProjects(
                     project=project, filterWrite=self._writeAccessFilter, strict=strict, membership=membership
                 )
         else:
-            self._cicd.addProject(filterWrite=self._writeAccessFilter, membership=membership)
+            logger.info(f"Listing GitLab projects")
+            self._cicd.addProjects(filterWrite=self._writeAccessFilter, membership=membership)
 
         if len(self._cicd.projects) == 0:
             if self._writeAccessFilter:
@@ -133,13 +136,16 @@ class GitLabRunner:
     def getGroups(self, group):
         if group:
             if exists(group):
+                logger.info(f"Getting GitLab groups of a file: {group}")
                 with open(group, "r") as file:
                     for p in file:
                         self._cicd.addGroups(group)
 
             else:
+                logger.info(f"Getting GitLab group: {group}")
                 self._cicd.addGroups(group)
         else:
+            logger.info(f"Listing GitLab groups")
             self._cicd.addGroups()
 
         if len(self._cicd.groups) == 0:
