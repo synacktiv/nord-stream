@@ -2,8 +2,8 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name>]
+    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name>]
     nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
     nord-stream devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream devops [options] --token <pat> --org <org> --list-projects [--write-filter]
@@ -41,6 +41,7 @@ args:
     --describe-token                        Display information on the token
     --branch-name <name>                    Use specific branch name for deployment.
     --pipeline-name <name>                  Use pipeline for deployment.
+    --pipeline-file <filename>              Pipeline filename (default: azure-pipelines.yml).
     --repo-name <name>                      Use specific repo for deployment.
 
 Exctraction:
@@ -58,10 +59,11 @@ Authors: @hugow @0hexit
 """
 
 from docopt import docopt
+
 from nordstream.cicd.devops import DevOps
 from nordstream.core.devops.devops import DevOpsRunner
-from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
+from nordstream.utils.log import NordStreamLog, logger
 
 
 def start(argv):
@@ -97,7 +99,8 @@ def start(argv):
         Git.USER = args["--user"]
     if args["--email"]:
         Git.EMAIL = args["--email"]
-
+    if args["--pipeline-file"]:
+        devopsRunner.pipelineFilename = args["--pipeline-file"]
     if args["--yaml"]:
         devopsRunner.yaml = args["--yaml"]
     if args["--write-filter"]:
