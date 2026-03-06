@@ -262,6 +262,7 @@ class DevOps:
                 requests.get(
                     f"https://dev.azure.com/{org}/_apis/ConnectionData",
                     auth=("foo", token),
+                    headers=DevOps._header,
                     verify=verifCert,
                 ).status_code
                 == 200

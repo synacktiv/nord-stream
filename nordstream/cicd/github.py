@@ -246,7 +246,7 @@ class GitHub:
         logger.debug("Getting environment protections")
         envReq = urllib.parse.quote(env, safe="")
         res = []
-        response = requests.get(
+        response = self._session.get(
             f"{self._repoURL}/{repo}/environments/{envReq}",
             auth=self._auth,
             headers=self._header,

@@ -9,7 +9,7 @@ from nordstream.git import Git
 from nordstream.utils.constants import *
 from nordstream.utils.helpers import isGitLabSessionCookie
 
-# painfull warnings you know what you are doing right ?
+# painful warnings you know what you are doing right ?
 requests.packages.urllib3.disable_warnings()
 
 
@@ -80,7 +80,7 @@ class GitLab:
         # from https://docs.gitlab.com/ee/api/rest/index.html#personalprojectgroup-access-tokens
         try:
             cookies = {}
-            headers = {"User-Agent": USER_AGENT}
+            headers = GitLab._headers
 
             if isGitLabSessionCookie(token):
                 cookies["_gitlab_session"] = token
@@ -115,6 +115,8 @@ class GitLab:
             self._session.cookies.update({"_gitlab_session": self._token})
         else:
             self._session.headers.update({"PRIVATE-TOKEN": self._token})
+
+        self._session.headers.update(self._headers)
 
     def __paginatedGet(self, url, params={}):
 
