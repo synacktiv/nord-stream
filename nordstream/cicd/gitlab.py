@@ -247,6 +247,9 @@ class GitLab:
         response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL)
 
         if response.status_code == 200 and len(response.text) > 0:
+            if response.json().get("data", {}).get("project", {}) is None:
+                return res
+
             path = self.__createOutputDir(project.get("path_with_namespace"))
 
             f = open(f"{path}/secrets.txt", "a")
@@ -268,7 +271,7 @@ class GitLab:
 
                 res.append(secret)
 
-                f.write(f"{variable['key']}={variable['value']}\n")
+                f.write(f"{variable['key']}={variable['raw']}\n")
 
             f.close()
 
