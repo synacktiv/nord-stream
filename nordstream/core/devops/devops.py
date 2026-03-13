@@ -23,6 +23,8 @@ class DevOpsRunner:
     _extractSSHServiceConnections = True
     _yaml = None
     _writeAccessFilter = False
+    _poolName = None
+    _os = "Linux"
     _pipelineFilename = "azure-pipelines.yml"
     _output = None
     _cleanLogs = True
@@ -130,6 +132,22 @@ class DevOpsRunner:
     @writeAccessFilter.setter
     def writeAccessFilter(self, value):
         self._writeAccessFilter = value
+
+    @property
+    def poolName(self):
+        return self._poolName
+
+    @poolName.setter
+    def poolName(self, value):
+        self._poolName = value
+
+    @property
+    def os(self):
+        return self._os
+
+    @os.setter
+    def os(self, value):
+        self._os = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/azure_devops"
@@ -284,7 +302,7 @@ class DevOpsRunner:
         elif pipelineType == "ssh":
             pipelineGenerator.generatePipelineForSSH("#FIXME")
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
+            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self._poolName, self._os)
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
@@ -297,7 +315,10 @@ class DevOpsRunner:
         ) as output:
             try:
                 if resType == self._resType["doubleb64"]:
-                    pipelineResults = self.__doubleb64(output)
+                    if self._os == "Windows":
+                        pipelineResults = self.__doubleb64Windows(output)
+                    else:
+                        pipelineResults = self.__doubleb64(output)
                 elif resType == self._resType["github"]:
                     pipelineResults = self.__extractGitHubResults(output)
                 elif resType == self._resType["azurerm"]:
@@ -331,6 +352,12 @@ class DevOpsRunner:
     def __doubleb64(output):
         # well it's working
         data = output.readlines()[-3].split(b" ")[1]
+        return base64.b64decode(base64.b64decode(data))
+
+    @staticmethod
+    def __doubleb64Windows(output):
+        # well it's working
+        data = output.readlines()[-2].split(b" ")[1]
         return base64.b64decode(base64.b64decode(data))
 
     @staticmethod
@@ -399,7 +426,7 @@ class DevOpsRunner:
             if len(variableGroups) > 0:
                 for variableGroup in variableGroups:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup)
+                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup, self._poolName, self._os)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for variable group: "{variableGroup["name"]}"'
@@ -435,7 +462,7 @@ class DevOpsRunner:
             if secureFiles:
                 for secureFile in secureFiles:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"])
+                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"], self._poolName)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for the secure file: "{secureFile["name"]}"'

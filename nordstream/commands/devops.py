@@ -43,6 +43,10 @@ args:
     --pipeline-name <name>                  Use pipeline for deployment.
     --pipeline-file <filename>              Pipeline filename (default: azure-pipelines.yml).
     --repo-name <name>                      Use specific repo for deployment.
+    --pool-name <name>                      Use specific pool name for deployment. This value will be set as pool name in the YAML file
+    --default-agent <name>                  Use specific default agent pool for deployment. This value will be used as Default agent pool for the pipeline
+    --os [Linux | Windows]                  The agent's OS where the pipeline will be run. Default to Linux
+    --sleep <int>                           Sleep this amount of time before retrieving pipeline result (15s by default)
 
 Exctraction:
     --extract <list>                        Extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
@@ -90,6 +94,10 @@ def start(argv):
         devops.pipelineName = args["--pipeline-name"]
     if args["--repo-name"]:
         devops.repoName = args["--repo-name"]
+    if args["--default-agent"]:
+        devops.defaultAgentPool = args["--default-agent"]
+    if args["--sleep"]:
+        devops.sleepTime = args["--sleep"]
 
     devopsRunner = DevOpsRunner(devops)
 
@@ -105,6 +113,10 @@ def start(argv):
         devopsRunner.yaml = args["--yaml"]
     if args["--write-filter"]:
         devopsRunner.writeAccessFilter = args["--write-filter"]
+    if args["--pool-name"]:
+        devopsRunner.poolName = args["--pool-name"]
+    if args["--os"]:
+        devopsRunner.os = args["--os"]
 
     if args["--extract"] and args["--no-extract"]:
         logger.critical("Can't use both --service-connection and --no-service-connection option.")

@@ -20,6 +20,21 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         "trigger": "none",
         "variables": [{"group": "#FIXME"}],
     }
+    _defaultTemplateWindows = {
+        "pool": {"vmImage": "windows-latest"},
+        "steps": [
+            {
+                "task": "PowerShell@2",
+                "displayName": taskName,
+                "inputs": { 
+                    "targetType": "inline",
+                    "script": "#FIXME"
+                }
+            }
+        ],
+        "trigger": "none",
+        "variables": [{"group": "#FIXME"}],
+    }
     _secureFileTemplate = {
         "pool": {"vmImage": "ubuntu-latest"},
         "trigger": "none",
@@ -166,13 +181,20 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
         ],
     }
 
-    def generatePipelineForSecretExtraction(self, variableGroup):
+    def generatePipelineForSecretExtraction(self, variableGroup, poolName, os):
+        if os == "Windows":
+            self.addSecretsToYamlWindows(variableGroup.get("variables"))
+        else:
+            self.addSecretsToYaml(variableGroup.get("variables"))
         self.addVariableGroupToYaml(variableGroup.get("name"))
-        self.addSecretsToYaml(variableGroup.get("variables"))
+        if poolName:
+            self._defaultTemplate["pool"] = {"name": poolName}
 
-    def generatePipelineForSecureFileExtraction(self, secureFile):
+    def generatePipelineForSecureFileExtraction(self, secureFile, poolName):
         self._defaultTemplate = self._secureFileTemplate
         self.__setSecureFile(secureFile)
+        if poolName:
+            self._defaultTemplate["pool"] = {"name": poolName}
 
     def generatePipelineForAzureRm(self, azureSubscription):
         self._defaultTemplate = self._serviceConnectionTemplateAzureRM
@@ -204,6 +226,28 @@ class DevOpsPipelineGenerator(YamlGeneratorBase):
             key = f"secret_{sec}"
             value = f"$({sec})"
             self._defaultTemplate.get("steps")[0].get("env")[key] = value
+
+    def addSecretsToYamlWindows(self, secrets):
+        self._defaultTemplate = self._defaultTemplateWindows
+        secretVars = ""
+        for sec in secrets:
+            key = f"secret_{sec}"
+            value = f"$({sec})"
+            secretVars = secretVars + "'" + key + "'" + "=" + "\"" + value + "\"" + "\n"
+        self._defaultTemplate["steps"][0]["inputs"]["script"] = """
+        $secret_vars = @{{        
+          {secretVars}
+        }}
+
+        $secret_vars.GetEnumerator() | ForEach-Object {{
+          $output += "$($_.Key)=$($_.Value)`n" 
+        }}
+            
+        $output = $output.TrimEnd("`n")
+        $base1 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(("{{0}}" -f $output)))
+        $base2 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(("{{0}}" -f $base1)))
+        Write-Host $base2
+        """.format(secretVars=secretVars)
 
     def __setSecureFile(self, secureFile):
         self._defaultTemplate.get("steps")[0].get("inputs")["secureFile"] = secureFile
