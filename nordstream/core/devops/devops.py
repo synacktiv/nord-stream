@@ -800,8 +800,8 @@ class DevOpsRunner:
 
         self._extractVariableGroups = isAllowed("vg", extractList, allow)
         self._extractSecureFiles = isAllowed("sf", extractList, allow)
-        self._extractAzureServiceconnections = isAllowed("vg", extractList, allow)
-        self._extractGitHubServiceconnections = isAllowed("az", extractList, allow)
+        self._extractAzureServiceconnections = isAllowed("az", extractList, allow)
+        self._extractGitHubServiceconnections = isAllowed("gh", extractList, allow)
         self._extractAWSServiceconnections = isAllowed("aws", extractList, allow)
         self._extractSonarServiceconnections = isAllowed("sonar", extractList, allow)
         self._extractSSHServiceConnections = isAllowed("ssh", extractList, allow)
