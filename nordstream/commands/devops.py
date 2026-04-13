@@ -116,7 +116,7 @@ def start(argv):
     if args["--pool-name"]:
         devopsRunner.poolName = args["--pool-name"]
     if args["--os"]:
-        devopsRunner.os = args["--os"]
+        devopsRunner.os = args["--os"].lower()
 
     if args["--extract"] and args["--no-extract"]:
         logger.critical("Can't use both --service-connection and --no-service-connection option.")

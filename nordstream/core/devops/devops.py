@@ -315,10 +315,7 @@ class DevOpsRunner:
         ) as output:
             try:
                 if resType == self._resType["doubleb64"]:
-                    if self._os == "Windows":
-                        pipelineResults = self.__doubleb64Windows(output)
-                    else:
-                        pipelineResults = self.__doubleb64(output)
+                    pipelineResults = self.__doubleb64(output)
                 elif resType == self._resType["github"]:
                     pipelineResults = self.__extractGitHubResults(output)
                 elif resType == self._resType["azurerm"]:
@@ -352,12 +349,6 @@ class DevOpsRunner:
     def __doubleb64(output):
         # well it's working
         data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
-
-    @staticmethod
-    def __doubleb64Windows(output):
-        # well it's working
-        data = output.readlines()[-2].split(b" ")[1]
         return base64.b64decode(base64.b64decode(data))
 
     @staticmethod
@@ -827,8 +818,8 @@ class DevOpsRunner:
 
         self._extractVariableGroups = isAllowed("vg", extractList, allow)
         self._extractSecureFiles = isAllowed("sf", extractList, allow)
-        self._extractAzureServiceconnections = isAllowed("vg", extractList, allow)
-        self._extractGitHubServiceconnections = isAllowed("az", extractList, allow)
+        self._extractAzureServiceconnections = isAllowed("az", extractList, allow)
+        self._extractGitHubServiceconnections = isAllowed("gh", extractList, allow)
         self._extractAWSServiceconnections = isAllowed("aws", extractList, allow)
         self._extractSonarServiceconnections = isAllowed("sonar", extractList, allow)
         self._extractSSHServiceConnections = isAllowed("ssh", extractList, allow)
