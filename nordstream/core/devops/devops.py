@@ -23,6 +23,8 @@ class DevOpsRunner:
     _extractSSHServiceConnections = True
     _yaml = None
     _writeAccessFilter = False
+    _poolName = None
+    _os = "linux"
     _pipelineFilename = "azure-pipelines.yml"
     _output = None
     _cleanLogs = True
@@ -130,6 +132,22 @@ class DevOpsRunner:
     @writeAccessFilter.setter
     def writeAccessFilter(self, value):
         self._writeAccessFilter = value
+
+    @property
+    def poolName(self):
+        return self._poolName
+
+    @poolName.setter
+    def poolName(self, value):
+        self._poolName = value
+
+    @property
+    def os(self):
+        return self._os
+
+    @os.setter
+    def os(self, value):
+        self._os = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/azure_devops"
@@ -274,17 +292,17 @@ class DevOpsRunner:
     def createYaml(self, pipelineType):
         pipelineGenerator = DevOpsPipelineGenerator()
         if pipelineType == "github":
-            pipelineGenerator.generatePipelineForGitHub("#FIXME")
+            pipelineGenerator.generatePipelineForGitHub("#FIXME", self._poolName, self._os)
         elif pipelineType == "azurerm":
-            pipelineGenerator.generatePipelineForAzureRm("#FIXME")
+            pipelineGenerator.generatePipelineForAzureRm("#FIXME", self._poolName, self._os)
         elif pipelineType == "aws":
-            pipelineGenerator.generatePipelineForAWS("#FIXME")
+            pipelineGenerator.generatePipelineForAWS("#FIXME", self._poolName, self._os)
         elif pipelineType == "sonar":
-            pipelineGenerator.generatePipelineForSonar("#FIXME")
+            pipelineGenerator.generatePipelineForSonar("#FIXME", self._poolName, self._os)
         elif pipelineType == "ssh":
-            pipelineGenerator.generatePipelineForSSH("#FIXME")
+            pipelineGenerator.generatePipelineForSSH("#FIXME", self._poolName, self._os)
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""})
+            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self._poolName, self._os)
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
@@ -399,7 +417,7 @@ class DevOpsRunner:
             if len(variableGroups) > 0:
                 for variableGroup in variableGroups:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup)
+                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup, self._poolName, self._os)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for variable group: "{variableGroup["name"]}"'
@@ -435,7 +453,7 @@ class DevOpsRunner:
             if secureFiles:
                 for secureFile in secureFiles:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"])
+                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"], self._poolName)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for the secure file: "{secureFile["name"]}"'
@@ -468,7 +486,7 @@ class DevOpsRunner:
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForGitHub(endpoint)
+        pipelineGenerator.generatePipelineForGitHub(endpoint, self._poolName, self._os)
 
         logger.info(f'Extracting secrets for GitHub: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -485,7 +503,7 @@ class DevOpsRunner:
         if scheme == "serviceprincipal":
             name = sc.get("name")
             pipelineGenerator = DevOpsPipelineGenerator()
-            pipelineGenerator.generatePipelineForAzureRm(name)
+            pipelineGenerator.generatePipelineForAzureRm(name, self._poolName, self._os)
 
             logger.info(f'Extracting secrets for AzureRM: "{name}"')
             runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -506,7 +524,7 @@ class DevOpsRunner:
             name = sc.get("name")
 
             pipelineGenerator = DevOpsPipelineGenerator()
-            pipelineGenerator.generatePipelineForAWS(name)
+            pipelineGenerator.generatePipelineForAWS(name, self._poolName, self._os)
 
             logger.info(f'Extracting secrets for AWS: "{name}"')
             runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -523,7 +541,7 @@ class DevOpsRunner:
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForSonar(endpoint)
+        pipelineGenerator.generatePipelineForSonar(endpoint, self._poolName, self._os)
 
         logger.info(f'Extracting secrets for Sonar: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -538,7 +556,7 @@ class DevOpsRunner:
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForSSH(endpoint)
+        pipelineGenerator.generatePipelineForSSH(endpoint, self._poolName, self._os)
 
         logger.info(f'Extracting secrets for ssh: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)

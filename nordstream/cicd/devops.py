@@ -30,6 +30,7 @@ class DevOps:
     _outputDir = OUTPUT_DIR
     _pipelineName = _DEFAULT_PIPELINE_NAME
     _branchName = _DEFAULT_BRANCH_NAME
+    _defaultAgentPool = None
     _sleepTime = 15
     _maxRetry = 10
 
@@ -73,6 +74,22 @@ class DevOps:
     @pipelineName.setter
     def pipelineName(self, value):
         self._pipelineName = value
+
+    @property
+    def defaultAgentPool(self):
+        return self._defaultAgentPool
+
+    @defaultAgentPool.setter
+    def defaultAgentPool(self, value):
+        self._defaultAgentPool = value
+
+    @property
+    def sleepTime(self):
+        return self._sleepTime
+
+    @sleepTime.setter
+    def sleepTime(self, value):
+        self._sleepTime = int(value)
 
     @property
     def token(self):
@@ -357,7 +374,7 @@ class DevOps:
         return response.status_code == 204
 
     def createPipeline(self, project, repoId, path):
-        logger.debug("creating pipeline")
+        logger.debug("Creating pipeline")
         data = {
             "folder": None,
             "name": self._pipelineName,
@@ -375,7 +392,43 @@ class DevOps:
             f"{self._baseURL}/{project}/_apis/pipelines",
             json=data,
         ).json()
-        return response.get("id")
+        pipeline_id = response.get("id")
+
+        if self._defaultAgentPool:
+            logger.debug("Setting default agent pool")
+            # Retrieve project queues, not organization pools, for Default agent pool
+            queues_url = f"{self._baseURL}/{project}/_apis/distributedtask/queues"
+            response = self._session.get(queues_url)
+            queues = response.json()
+            
+            queue_id = None
+            queue_name = None
+            for queue in queues['value']:
+                if queue['pool']['name'] == self._defaultAgentPool:
+                    queue_id = queue['id']
+                    queue_name = queue['name']
+                    logger.info(f"Queue found : {queue_name} (Queue ID: {queue_id}, Pool ID: {queue['pool']['id']})")
+                    break
+            
+            if not queue_id:
+                logger.error(f"Queue {self._defaultAgentPool} not found for default agent pool, or not accessible by the project. Not updating")
+                return pipeline_id
+
+            # Update pipeline Default agent with specified queue, via the definitions API 
+            update_url = f"{self._baseURL}/{project}/_apis/build/definitions/{pipeline_id}"
+
+            response = self._session.get(update_url)
+            definition = response.json()
+
+            # Add default pool agent with queue
+            definition['queue'] = {
+                'id': queue_id,
+                'name': queue_name
+            }
+
+            response = self._session.put(update_url, json=definition)
+        
+        return pipeline_id
 
     def runPipeline(self, project, pipelineId):
         logger.debug(f"Running pipeline: {pipelineId}")
