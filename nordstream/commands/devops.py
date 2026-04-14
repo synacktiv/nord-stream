@@ -2,9 +2,9 @@
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name>]
-    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name>]
-    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
+    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name> --pool-name <name> --os <os> --default-agent <name> --sleep <int>]
+    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name> --sleep <int>]
+    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>] [--pool-name <name>] [--os linux|windows]
     nord-stream devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream devops [options] --token <pat> --org <org> --list-projects [--write-filter]
     nord-stream devops [options] --token <pat> --org <org> --list-repositories [--project <project>]
@@ -45,7 +45,7 @@ args:
     --repo-name <name>                      Use specific repo for deployment.
     --pool-name <name>                      Use specific pool name for deployment. This value will be set as pool name in the YAML file
     --default-agent <name>                  Use specific default agent pool for deployment. This value will be used as Default agent pool for the pipeline
-    --os [Linux | Windows]                  The agent's OS where the pipeline will be run. Default to Linux
+    --os [linux | windows]                  The agent's OS where the pipeline will be run. Default to linux
     --sleep <int>                           Sleep this amount of time before retrieving pipeline result (15s by default)
 
 Exctraction:

