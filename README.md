@@ -20,6 +20,8 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
       - [Signing commits](#signing-commits)
     - [Azure DevOps](#azure-devops)
       - [Service connections](#service-connections)
+        - [SSH](#ssh)
+      - [Listing orgs](#listing-orgs)
       - [Help](#help)
     - [GitHub](#github)
       - [List protections](#list-protections)
@@ -272,6 +274,18 @@ Then you need to:
 If you need to run this on a windows self-hosted runner, in the `generatePipelineForSSH` method change `_serviceConnectionTemplateSSH` by `_serviceConnectionTemplateSSHWindows` and perform the actions described previously.
 
 Note: for both Windows and Linux self-hosted runners, you need to adapt the path (`/home/vsts/work/_tasks/` or `D:\a\`) to match the path where the runner is deployed. This information can be obtained in the `Capabilities` tab of an agent on Azure DevOps.
+
+#### Listing orgs
+
+With an access token it's possible to list the organizations bound to a user:
+```
+$ nord-stream devops --token "eyJ0eXA..." --list-orgs
+[*] User orgs:
+        - myorg
+        - supersecretorg
+```
+
+This is based on [this research](https://zolder.io/en/blog/devops-access-is-closer-than-you-assume/).
 
 #### Help
 ```

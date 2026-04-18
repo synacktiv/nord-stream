@@ -10,6 +10,7 @@ Usage:
     nord-stream devops [options] --token <pat> --org <org> --list-repositories [--project <project>]
     nord-stream devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
     nord-stream devops [options] --token <pat> --org <org> --describe-token
+    nord-stream devops [options] --token <pat> --list-orgs
 
 Options:
     -h --help                               Show this screen.
@@ -68,6 +69,7 @@ from nordstream.cicd.devops import DevOps
 from nordstream.core.devops.devops import DevOpsRunner
 from nordstream.git import Git
 from nordstream.utils.log import NordStreamLog, logger
+from nordstream.utils.devops import listOrgs
 
 
 def start(argv):
@@ -80,6 +82,11 @@ def start(argv):
         NordStreamLog.setVerbosity(verbose=2)
 
     logger.debug(args)
+
+    if args["--list-orgs"]:
+        listOrgs(args["--token"])
+        return
+
     # check validity of the token
     if not DevOps.checkToken(args["--token"], args["--org"], (not args["--ignore-cert"])):
         logger.critical("Invalid token or org.")
