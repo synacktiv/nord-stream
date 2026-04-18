@@ -1,6 +1,5 @@
 import random, string
 
-
 def isHexadecimal(s):
     hex_digits = set("0123456789abcdefABCDEF")
     return all(c in hex_digits for c in s)
