@@ -662,3 +662,35 @@ class DevOps:
         except:
             pass
         return res
+
+    @classmethod
+    def getOrgs(cls, token):
+        logger.verbose(f"Listing orgs")
+        if isAZDOBearerToken(token):
+            # https://github.com/zolderio/devops/blob/main/get_profile_org_repos.py
+            url = "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1"
+
+            # Headers with authentication and content type
+            headers = {
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+
+            response = requests.get(url, headers=headers)
+
+            # Check if request was successful
+            response.raise_for_status()
+            
+            # Parse and print the JSON response
+            data = response.json()
+            
+            # Get organizations URL from profile response
+            orgs_url = "https://app.vssps.visualstudio.com/_apis/accounts?memberId={}?api-version=7.1".format(data['id'])
+            
+            # Get organizations
+            orgs_response = requests.get(orgs_url, headers=headers)
+            orgs_response.raise_for_status()
+            
+            return orgs_response.json()
+        else:
+            raise DevOpsError("Only access token can be used for this operation.")
