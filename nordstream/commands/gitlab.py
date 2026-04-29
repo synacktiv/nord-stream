@@ -7,6 +7,9 @@ Usage:
     nord-stream gitlab [options] --token <pat> --yaml <yaml> --project <project> [--project-path <path> --no-clean]
     nord-stream gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream gitlab [options] --token <pat> --describe-token
+    nord-stream gitlab [options] --token <pat> --circleci --project <project> [--no-project --no-org --branch-name <name> --no-clean]
+    nord-stream gitlab [options] --token <pat> --circleci --yaml <yaml> --project <project> [--branch-name <name> --no-clean]
+    nord-stream gitlab [options] --token <pat> --circleci --list-secrets [--project <project> --no-project --no-org]
 
 Options:
     -h --help                               Show this screen.
@@ -37,6 +40,7 @@ args:
     --no-project                            Don't extract project secrets.
     --no-group                              Don't extract group secrets.
     --no-instance                           Don't extract instance secrets.
+    --no-org                                Don't extract org-level CircleCI contexts (CircleCI mode only).
     -y, --yaml <yaml>                       Run arbitrary job
     --branch-name <name>                    Use specific branch name for deployment.
     --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
@@ -44,6 +48,14 @@ args:
     --describe-token                        Display information on the token
     --sleep <seconds>                       Time to sleep in seconds between each secret request.
     --project-path <path>                   Local path of the git folder.
+    --circleci                              Target CircleCI pipelines instead of GitLab CI
+    --circleci-token <cct>                  CircleCI API token (required when --circleci is used)
+    --circleci-vcs <vcs>                    CircleCI VCS type: 'gl', 'gh', or 'circleci' for GitHub App / GitLab App
+                                            projects (default: gl)
+    --circleci-org <org>                    CircleCI org name or ID (defaults to the GitLab group/namespace).
+                                            Use the org UUID when --circleci-vcs circleci
+    --circleci-project <project>            CircleCI project name or ID for a single target project.
+                                            Use the project UUID when --circleci-vcs circleci
 
 Examples:
     Dump all secrets
@@ -51,6 +63,9 @@ Examples:
 
     Deploy the custom pipeline on the master branch
     $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --yaml exploit.yaml --branch master --project 'group/projectname'
+
+    List CircleCI secrets for a GitLab-hosted project
+    $ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --circleci --circleci-token "$CCT" --list-secrets --project 'group/projectname'
 
 Authors: @hugow @0hexit
 """
@@ -110,6 +125,30 @@ def start(argv):
         gitLabRunner.sleepTime = args["--sleep"]
     if args["--project-path"]:
         gitLabRunner.localPath = args["--project-path"]
+
+    # CircleCI mode — build a CircleCIRunner backed by the GitLab API client
+    if args["--circleci"]:
+        if not args["--circleci-token"]:
+            logger.critical("--circleci-token is required when --circleci is used.")
+
+        from nordstream.cicd.circleci import CircleCI
+        from nordstream.core.circleci.circleci import CircleCIRunner
+
+        if not CircleCI.checkToken(args["--circleci-token"]):
+            logger.critical("Invalid CircleCI token.")
+
+        circleCIClient = CircleCI(args["--circleci-token"])
+        _circleCIVcs = args["--circleci-vcs"] or "gl"
+        _circleCIOrg = args["--circleci-org"]  # caller must supply for gitlab
+        _circleCIProject = args["--circleci-project"]
+        # TODO: implement full GitLab-backed CircleCIRunner (vcsType="gl")
+        # For now we raise a clear not-implemented message so the user knows
+        # the feature is planned but not yet wired to GitLab-specific git ops.
+        logger.critical(
+            "CircleCI extraction via GitLab is not yet implemented. "
+            "Please use the 'github' subcommand for CircleCI extraction on GitHub-hosted repositories."
+        )
+        return  # unreachable — logger.critical() calls exit(1)
 
     # logic
     if args["--describe-token"]:
