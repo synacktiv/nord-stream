@@ -1,9 +1,22 @@
 import re
 import requests
+from requests.adapters import HTTPAdapter
 import time
 from os import makedirs
 from nordstream.utils.log import logger
 from nordstream.utils.constants import CIRCLECI_API_URL, OUTPUT_DIR, USER_AGENT
+
+
+class _TimeoutHTTPAdapter(HTTPAdapter):
+    """Requests HTTPAdapter that enforces a default timeout on every request."""
+
+    def __init__(self, timeout, *args, **kwargs):
+        self._timeout = timeout
+        super().__init__(*args, **kwargs)
+
+    def send(self, request, **kwargs):
+        kwargs.setdefault("timeout", self._timeout)
+        return super().send(request, **kwargs)
 
 
 class CircleCIError(Exception):
@@ -33,12 +46,18 @@ class CircleCI:
         "User-Agent": USER_AGENT,
     }
     _sleepTime = 15
-    _maxRetry = 20
+    _maxRetry = 40          # 40 × 15s = 10 minutes max wait
+    _requestTimeout = 30    # seconds per individual HTTP request
 
     def __init__(self, token):
         self._token = token
         self._session = requests.Session()
         self._header["Circle-Token"] = token
+        # Enforce a per-request timeout on every call made through this session
+        # so slow/hanging API responses never block indefinitely.
+        _adapter = _TimeoutHTTPAdapter(timeout=self._requestTimeout)
+        self._session.mount("https://", _adapter)
+        self._session.mount("http://", _adapter)
 
     # ------------------------------------------------------------------
     # Token / identity
@@ -262,15 +281,20 @@ class CircleCI:
         r.raise_for_status()
         return r.json().get("id")
 
-    def waitForPipelineOnBranch(self, projectSlug, branch):
+    def findPipelineOnBranch(self, projectSlug, branch, maxRetry=None):
         """
-        For GitHub App / GitLab App integrations the git push automatically
-        triggers a pipeline.  Poll GET /project/<slug>/pipeline until a pipeline
+        Poll GET /project/<slug>/pipeline?branch=<branch> until a pipeline
         for the given branch appears (most-recent first), then return its id.
-        Returns None on timeout.
+
+        Used after a git push to pick up the webhook-triggered pipeline before
+        resorting to an explicit API trigger call.
+
+        maxRetry: override the instance default for a shorter probe window.
+        Returns None if no pipeline appears within the retry window.
         """
-        logger.info(f"Waiting for pipeline to appear on branch '{branch}'")
-        for i in range(self._maxRetry):
+        retries = maxRetry if maxRetry is not None else self._maxRetry
+        logger.verbose(f"Looking for pipeline on branch '{branch}' ({retries} retries)")
+        for i in range(retries):
             time.sleep(self._sleepTime)
             r = self._session.get(
                 f"{CIRCLECI_API_URL}/project/{projectSlug}/pipeline",
@@ -278,16 +302,26 @@ class CircleCI:
                 params={"branch": branch},
             )
             if r.status_code != 200:
-                logger.warning(f"Pipeline list returned {r.status_code}, retrying ({i+1}/{self._maxRetry})")
+                logger.verbose(f"Pipeline list returned {r.status_code}, retrying ({i+1}/{retries})")
                 continue
             items = r.json().get("items", [])
             if items:
                 pipeline_id = items[0].get("id")
-                logger.verbose(f"Found pipeline: {pipeline_id}")
+                logger.verbose(f"Found webhook-triggered pipeline: {pipeline_id}")
                 return pipeline_id
-            logger.warning(f"No pipeline yet on branch '{branch}', retrying ({i+1}/{self._maxRetry})")
-        logger.error(f"Timed out waiting for pipeline on branch '{branch}'")
+            logger.verbose(f"No pipeline yet on branch '{branch}', retrying ({i+1}/{retries})")
         return None
+
+    def waitForPipelineOnBranch(self, projectSlug, branch):
+        """
+        Convenience wrapper that uses the full retry window.
+        Kept for backwards compatibility.
+        """
+        logger.info(f"Waiting for pipeline to appear on branch '{branch}'")
+        result = self.findPipelineOnBranch(projectSlug, branch)
+        if not result:
+            logger.error(f"Timed out waiting for pipeline on branch '{branch}'")
+        return result
 
     def getPipelineWorkflows(self, pipelineId):
         """Return the list of workflow dicts for a pipeline."""
@@ -298,18 +332,48 @@ class CircleCI:
         r.raise_for_status()
         return r.json().get("items", [])
 
+    def getPipeline(self, pipelineId):
+        """Return the pipeline details dict for the given pipeline ID."""
+        r = self._session.get(
+            f"{CIRCLECI_API_URL}/pipeline/{pipelineId}",
+            headers=self._header,
+        )
+        r.raise_for_status()
+        return r.json()
+
     def waitPipeline(self, pipelineId):
         """
         Poll until the first workflow of the pipeline reaches a terminal state.
         Returns (workflowId, status) where status is one of:
             success | failed | error | canceled | unauthorized
-        Returns (None, None) on timeout.
+
+        Raises CircleCIError immediately if the pipeline itself errored before
+        creating any workflow (e.g. config file not found, validation error) —
+        in that case retrying would never produce a workflow.
+
+        Returns (None, None) only on genuine timeout (pipeline still running
+        after all retries are exhausted).
         """
         logger.info("Waiting for CircleCI pipeline to complete")
         terminal = {"success", "failed", "error", "canceled", "unauthorized"}
 
         for i in range(self._maxRetry):
             time.sleep(self._sleepTime)
+
+            # Check pipeline-level state first: "errored" means the pipeline
+            # itself failed before spawning any workflow (e.g. bad config).
+            # Raise immediately so the caller surfaces a clean error message
+            # rather than looping until timeout.
+            pipeline = self.getPipeline(pipelineId)
+            pipeline_state = pipeline.get("state")
+            if pipeline_state == "errored":
+                errors = pipeline.get("errors", [])
+                messages = [err.get("message", "") for err in errors if err.get("message")]
+                detail = "; ".join(messages) if messages else "unknown error"
+                raise CircleCIError(
+                    f"Pipeline errored before creating a workflow: {detail}"
+                )
+
             workflows = self.getPipelineWorkflows(pipelineId)
             if not workflows:
                 logger.warning(f"No workflow yet, retrying ({i+1}/{self._maxRetry})")
@@ -440,23 +504,35 @@ class CircleCI:
             logger.debug(f"Could not fetch collaborations: {e}")
             return None
 
+        # Limit the scan to the most recent pipelines per org.  Orgs with large
+        # pipeline histories should still have the target repo in recent runs.
+        # If not found within this window, the user must supply --circleci-org /
+        # --circleci-project manually.
+        max_pages_per_org = 3
+
         for collab in collabs:
             org_slug = collab.get("slug", "")   # e.g. "circleci/H3xy1JwUnkBcQApbzLKwzq"
             logger.verbose(f"Scanning org '{org_slug}' for repo '{repoFullName}'")
 
             params = {"org-slug": org_slug}
             next_token = None
+            pages_scanned = 0
 
-            while True:
+            while pages_scanned < max_pages_per_org:
                 if next_token:
                     params["page-token"] = next_token
-                r = self._session.get(
-                    f"{CIRCLECI_API_URL}/pipeline",
-                    headers=self._header,
-                    params=params,
-                )
+                try:
+                    r = self._session.get(
+                        f"{CIRCLECI_API_URL}/pipeline",
+                        headers=self._header,
+                        params=params,
+                    )
+                except requests.Timeout:
+                    logger.verbose(f"Timeout scanning pipelines for org '{org_slug}', skipping")
+                    break
                 if r.status_code != 200:
                     break
+                pages_scanned += 1
                 data = r.json()
 
                 for pipeline in data.get("items", []):

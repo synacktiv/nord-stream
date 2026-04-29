@@ -388,6 +388,7 @@ class CircleCIRunner:
         Returns (pipelineId, workflowId, jobNumber).
         """
         logger.verbose("Launching CircleCI pipeline.")
+        logger.info(f'Pushing to branch "{self._gitCicd.branchName}"')
 
         configPath = f".circleci/{self._configFilename}"
         generator.writeFile(configPath)
@@ -410,26 +411,37 @@ class CircleCIRunner:
 
         projectSlug = self.__projectSlug(repo)
 
-        if self.__effectiveVcsType(repo) == "circleci":
-            # GitHub App / GitLab App: push already triggered the pipeline.
-            # Poll the project's pipeline list to find the one for our branch.
-            logger.verbose("GitHub App integration — waiting for auto-triggered pipeline.")
-            pipelineId = self._circleCicd.waitForPipelineOnBranch(
-                projectSlug, self._gitCicd.branchName
-            )
-        else:
-            # Classic OAuth: explicitly trigger via the API.
-            pipelineId = self._circleCicd.triggerPipeline(projectSlug, self._gitCicd.branchName)
+        # Always poll for a webhook-triggered pipeline first.
+        # A git push fires a CircleCI webhook for all integration types (classic
+        # OAuth and GitHub App alike).  Calling triggerPipeline() on top of a
+        # webhook-triggered pipeline causes two pipelines to race, and auto-cancel
+        # rules on the project will cancel one — typically ours.
+        #
+        # Short probe window (3 retries): if the webhook pipeline appears quickly
+        # we pick it up immediately.  If the org has no webhook configured for
+        # this branch, we fall through and trigger explicitly via the API.
+        logger.verbose("Waiting for webhook-triggered pipeline.")
+        pipelineId = self._circleCicd.findPipelineOnBranch(
+            projectSlug, self._gitCicd.branchName, maxRetry=3
+        )
 
         if not pipelineId:
-            raise Exception("Failed to find or trigger CircleCI pipeline.")
+            # No webhook pipeline appeared — project may not have a CircleCI
+            # webhook for this branch.  Fall back to an explicit API trigger.
+            logger.verbose("No webhook pipeline found, triggering via API.")
+            pipelineId = self._circleCicd.triggerPipeline(
+                projectSlug, self._gitCicd.branchName
+            )
+
+        if not pipelineId:
+            raise CircleCIError("Failed to find or trigger CircleCI pipeline.")
 
         logger.verbose(f"Pipeline ID: {pipelineId}")
 
         workflowId, status = self._circleCicd.waitPipeline(pipelineId)
 
         if not workflowId:
-            raise Exception("Pipeline timed out or no workflow found.")
+            raise CircleCIError("Pipeline timed out waiting for a workflow to start.")
 
         # Resolve the job number from the workflow
         jobs = self._circleCicd.getWorkflowJobs(workflowId)
