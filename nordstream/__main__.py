@@ -9,6 +9,7 @@ Commands
     github                                  command related to GitHub.
     devops                                  command related to Azure DevOps.
     gitlab                                  command related to GitLab.
+    circleci                                command related to CircleCI (standalone, no git required).
 
 Options:
     -h --help                               Show this screen.
@@ -38,6 +39,10 @@ def main():
         import nordstream.commands.gitlab as gitlab
 
         gitlab.start(argv)
+    elif args["<command>"] == "circleci":
+        import nordstream.commands.circleci as circleci
+
+        circleci.start(argv)
     else:
         logger.error(f"{args['<command>']} is not a nord-stream command.")
 

@@ -692,3 +692,77 @@ class GitLab:
                 res.append(failure)
 
         return res
+
+    # ------------------------------------------------------------------
+    # Repository Files API — used by the standalone CircleCI runner to
+    # inject config files without requiring a local git installation.
+    # ------------------------------------------------------------------
+
+    def getFileSHA(self, projectId, path, branch="main"):
+        """
+        Return the last_commit_id (blob ref) for an existing file, or None.
+        GitLab uses the last commit ID as the equivalent of GitHub's blob SHA
+        for file operations — but for delete we just need the file to exist.
+        """
+        import urllib.parse as _up
+        logger.debug(f"Getting file info for {path} in project {projectId}@{branch}")
+        encoded_path = _up.quote(path, safe="")
+        r = self._session.get(
+            f"{self._url}/api/v4/projects/{projectId}/repository/files/{encoded_path}",
+            params={"ref": branch},
+            headers=self._header,
+        )
+        if r.status_code == 404:
+            return None
+        if r.status_code == 200:
+            # Return the blob_id as the "SHA" equivalent
+            return r.json().get("blob_id")
+        raise Exception(f"getFileSHA: unexpected status {r.status_code}")
+
+    def createOrUpdateFile(self, projectId, path, content, branch, commitMessage, existingSHA=None):
+        """
+        Create or update a file via the GitLab Repository Files API.
+        content: raw bytes or str.
+        existingSHA: if provided the file already exists and will be updated (PUT).
+        Returns the file_path (GitLab doesn't return a SHA on create/update).
+        """
+        import base64 as _b64, urllib.parse as _up
+        logger.debug(f"Creating/updating {path} in project {projectId}@{branch}")
+        if isinstance(content, bytes):
+            content = content.decode()
+        encoded_path = _up.quote(path, safe="")
+        payload = {
+            "branch": branch,
+            "content": content,
+            "commit_message": commitMessage,
+            "encoding": "text",
+        }
+        method = self._session.put if existingSHA else self._session.post
+        r = method(
+            f"{self._url}/api/v4/projects/{projectId}/repository/files/{encoded_path}",
+            json=payload,
+            headers=self._header,
+        ).json()
+        if r.get("message"):
+            raise Exception(f"createOrUpdateFile: {r['message']}")
+        return r.get("file_path")
+
+    def deleteFile(self, projectId, path, sha, branch, commitMessage):
+        """
+        Delete a file via the GitLab Repository Files API.
+        sha is not required by GitLab (unlike GitHub) but kept for interface parity.
+        """
+        import urllib.parse as _up
+        logger.debug(f"Deleting {path} in project {projectId}@{branch}")
+        encoded_path = _up.quote(path, safe="")
+        payload = {
+            "branch": branch,
+            "commit_message": commitMessage,
+        }
+        r = self._session.delete(
+            f"{self._url}/api/v4/projects/{projectId}/repository/files/{encoded_path}",
+            json=payload,
+            headers=self._header,
+        )
+        if r.status_code not in (200, 204):
+            raise Exception(f"deleteFile: status {r.status_code} — {r.text[:200]}")

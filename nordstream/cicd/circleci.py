@@ -407,3 +407,226 @@ class CircleCI:
     @outputDir.setter
     def outputDir(self, value):
         self._outputDir = value
+
+    # ------------------------------------------------------------------
+    # Project details
+    # ------------------------------------------------------------------
+
+    def getProjectDetails(self, projectSlug):
+        """
+        Return the project details dict for the given slug.
+        Includes: id (UUID), name, organization_id, vcs_info.
+        """
+        logger.debug(f"Getting project details for {projectSlug}")
+        r = self._session.get(
+            f"{CIRCLECI_API_URL}/project/{projectSlug}",
+            headers=self._header,
+        )
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        return r.json()
+
+    def listProjectsForOrg(self, orgSlug):
+        """
+        Discover all projects under an org by scanning recent pipelines.
+        Uses GET /pipeline?org-slug=<orgSlug> which works for all VCS types.
+
+        Returns a list of dicts:
+          {
+            "project_slug":   "circleci/H3xy.../RZ3k...",
+            "project_id":     "c6d4d2bc-...",        # UUID, needed for pipeline defs
+            "repo_full_name": "ScaumAcktiv/testrepo", # "org/repo" for the VCS host
+            "repo_url":       "https://github.com/ScaumAcktiv/testrepo",
+            "default_branch": "main",
+            "repo_external_id": "1224368302",         # VCS provider repo ID
+          }
+        """
+        logger.debug(f"Discovering projects for org slug '{orgSlug}'")
+        # slug → partial info dict; we may need multiple pipelines to fill all fields
+        partial = {}
+        params = {"org-slug": orgSlug}
+        next_token = None
+
+        while True:
+            if next_token:
+                params["page-token"] = next_token
+            r = self._session.get(
+                f"{CIRCLECI_API_URL}/pipeline",
+                headers=self._header,
+                params=params,
+            )
+            if r.status_code in (401, 403):
+                raise CircleCIError("Not authorised to list pipelines.")
+            if r.status_code == 404:
+                break
+            r.raise_for_status()
+            data = r.json()
+
+            for pipeline in data.get("items", []):
+                slug = pipeline.get("project_slug")
+                if not slug:
+                    continue
+
+                # Extract git repo info from trigger_parameters
+                tp = pipeline.get("trigger_parameters", {})
+                gh_app = tp.get("github_app", {})
+                git_params = tp.get("git", {})
+                vcs_info = pipeline.get("vcs", {})
+
+                repo_full_name = gh_app.get("repo_full_name")
+                if not repo_full_name:
+                    target_url = vcs_info.get("target_repository_url", "")
+                    parts = target_url.rstrip("/").split("/")
+                    if len(parts) >= 2:
+                        repo_full_name = "/".join(parts[-2:])
+
+                repo_url = (
+                    gh_app.get("repo_url")
+                    or git_params.get("repo_url")
+                    or vcs_info.get("target_repository_url")
+                )
+                default_branch = (
+                    gh_app.get("default_branch")
+                    or git_params.get("default_branch")
+                    or "main"
+                )
+                repo_external_id = gh_app.get("repo_id")
+
+                # Merge into partial dict — keep the first non-None value per field
+                entry = partial.setdefault(slug, {
+                    "repo_full_name": None,
+                    "repo_url": None,
+                    "default_branch": "main",
+                    "repo_external_id": None,
+                })
+                if repo_full_name and not entry["repo_full_name"]:
+                    entry["repo_full_name"] = repo_full_name
+                if repo_url and not entry["repo_url"]:
+                    entry["repo_url"] = repo_url
+                if default_branch and entry["default_branch"] == "main":
+                    entry["default_branch"] = default_branch
+                if repo_external_id and not entry["repo_external_id"]:
+                    entry["repo_external_id"] = repo_external_id
+
+            next_token = data.get("next_page_token")
+            if not next_token:
+                break
+
+        # Post-process: resolve project UUIDs and build final list
+        projects = []
+        for slug, entry in partial.items():
+            repo_full_name = entry["repo_full_name"]
+
+            # Resolve project UUID and fallback repo name via project details API
+            project_id = None
+            details = self.getProjectDetails(slug)
+            if details:
+                project_id = details.get("id")
+                if not repo_full_name:
+                    # For classic integrations vcs_url may be the GitHub/GitLab URL
+                    vcs = details.get("vcs_info", {})
+                    vcs_url = vcs.get("vcs_url", "")
+                    if "github.com" in vcs_url or "gitlab.com" in vcs_url:
+                        parts = vcs_url.rstrip("/").split("/")
+                        if len(parts) >= 2:
+                            repo_full_name = "/".join(parts[-2:])
+
+            if not repo_full_name:
+                logger.verbose(f"Could not determine repo_full_name for {slug}, skipping")
+                continue
+
+            projects.append({
+                "project_slug": slug,
+                "project_id": project_id,
+                "repo_full_name": repo_full_name,
+                "repo_url": entry["repo_url"],
+                "default_branch": entry["default_branch"],
+                "repo_external_id": entry["repo_external_id"],
+            })
+
+        return projects
+
+    # ------------------------------------------------------------------
+    # Pipeline definitions (GitHub App / GitLab App projects)
+    # ------------------------------------------------------------------
+
+    def listPipelineDefinitions(self, projectId):
+        """Return the list of pipeline definition dicts for a project UUID."""
+        logger.debug(f"Listing pipeline definitions for project {projectId}")
+        r = self._session.get(
+            f"{CIRCLECI_API_URL}/projects/{projectId}/pipeline-definitions",
+            headers=self._header,
+        )
+        if r.status_code == 404:
+            return []
+        r.raise_for_status()
+        return r.json().get("items", [])
+
+    def createPipelineDefinition(self, projectId, name, filePath, repoExternalId, provider="github_app"):
+        """
+        Create a new pipeline definition that reads its config from a specific
+        file path in the repo.  Returns the definition id (UUID).
+
+        projectId:      project UUID
+        name:           human-readable name (e.g. DEFAULT_PIPELINE_NAME)
+        filePath:       path to the config file (e.g. ".circleci/init_ZkITM.yml")
+        repoExternalId: numeric VCS repo ID (GitHub repo_id / GitLab project_id)
+        provider:       "github_app" or "github_server" or "gitlab_app"
+        """
+        logger.debug(f"Creating pipeline definition '{name}' in project {projectId}")
+        payload = {
+            "name": name,
+            "config_source": {
+                "provider": provider,
+                "repo": {"external_id": str(repoExternalId)},
+                "file_path": filePath,
+            },
+            "checkout_source": {
+                "provider": provider,
+                "repo": {"external_id": str(repoExternalId)},
+            },
+        }
+        r = self._session.post(
+            f"{CIRCLECI_API_URL}/projects/{projectId}/pipeline-definitions",
+            headers=self._header,
+            json=payload,
+        )
+        if r.status_code in (401, 403):
+            raise CircleCIError(f"Not authorised to create pipeline definition in {projectId}")
+        r.raise_for_status()
+        return r.json().get("id")
+
+    def deletePipelineDefinition(self, projectId, definitionId):
+        """Delete a pipeline definition by its UUID."""
+        logger.debug(f"Deleting pipeline definition {definitionId} from project {projectId}")
+        self._session.delete(
+            f"{CIRCLECI_API_URL}/projects/{projectId}/pipeline-definitions/{definitionId}",
+            headers=self._header,
+        )
+
+    def triggerPipelineRun(self, projectSlug, definitionId, branch):
+        """
+        Trigger a pipeline run using the recommended /pipeline/run endpoint.
+        Used for GitHub App / GitLab App projects (vcsType "circleci").
+        Returns the pipeline id, or None on failure.
+        """
+        logger.debug(f"Triggering pipeline/run for {projectSlug} def={definitionId} branch={branch}")
+        # The slug format for this endpoint is {provider}/{org}/{project}
+        provider, org, project = projectSlug.split("/", 2)
+        payload = {
+            "definition_id": definitionId,
+            "config": {"branch": branch},
+            "checkout": {"branch": branch},
+        }
+        r = self._session.post(
+            f"{CIRCLECI_API_URL}/project/{provider}/{org}/{project}/pipeline/run",
+            headers=self._header,
+            json=payload,
+        )
+        if r.status_code in (401, 403):
+            raise CircleCIError(f"Not authorised to trigger pipeline run for {projectSlug}")
+        data = r.json()
+        if data.get("message"):
+            raise CircleCIError(f"triggerPipelineRun: {data['message']}")
+        return data.get("id")

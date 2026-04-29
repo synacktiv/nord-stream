@@ -618,3 +618,75 @@ class GitHub:
 
     def isGHSToken(self):
         return self._isGHSToken
+
+    # ------------------------------------------------------------------
+    # Contents API — used by the standalone CircleCI runner to inject
+    # config files without requiring a local git installation.
+    # ------------------------------------------------------------------
+
+    def getFileSHA(self, repo, path, branch="main"):
+        """
+        Return the blob SHA of an existing file, or None if it doesn't exist.
+        Required by the GitHub Contents API to update or delete a file.
+        """
+        logger.debug(f"Getting SHA for {path} in {repo}@{branch}")
+        r = self._session.get(
+            f"{self._repoURL}/{repo}/contents/{urllib.parse.quote(path)}",
+            params={"ref": branch},
+            auth=self._auth,
+            headers=self._header,
+        )
+        if r.status_code == 404:
+            return None
+        if r.status_code == 200:
+            return r.json().get("sha")
+        raise GitHubError(f"getFileSHA: unexpected status {r.status_code}")
+
+    def createOrUpdateFile(self, repo, path, content, branch, commitMessage, existingSHA=None):
+        """
+        Create or update a file via the GitHub Contents API.
+        content: raw bytes or str — will be base64-encoded.
+        existingSHA: required when updating an existing file.
+        Returns the blob SHA of the created/updated file.
+        """
+        import base64 as _b64
+        logger.debug(f"Creating/updating {path} in {repo}@{branch}")
+        if isinstance(content, str):
+            content = content.encode()
+        encoded = _b64.b64encode(content).decode()
+        payload = {
+            "message": commitMessage,
+            "content": encoded,
+            "branch": branch,
+        }
+        if existingSHA:
+            payload["sha"] = existingSHA
+        r = self._session.put(
+            f"{self._repoURL}/{repo}/contents/{urllib.parse.quote(path)}",
+            json=payload,
+            auth=self._auth,
+            headers=self._header,
+        ).json()
+        if r.get("message"):
+            raise GitHubError(f"createOrUpdateFile: {r['message']}")
+        return r.get("content", {}).get("sha")
+
+    def deleteFile(self, repo, path, sha, branch, commitMessage):
+        """
+        Delete a file via the GitHub Contents API.
+        sha: the blob SHA returned by createOrUpdateFile / getFileSHA.
+        """
+        logger.debug(f"Deleting {path} in {repo}@{branch}")
+        payload = {
+            "message": commitMessage,
+            "sha": sha,
+            "branch": branch,
+        }
+        r = self._session.delete(
+            f"{self._repoURL}/{repo}/contents/{urllib.parse.quote(path)}",
+            json=payload,
+            auth=self._auth,
+            headers=self._header,
+        ).json()
+        if r.get("message") and "commit" not in r:
+            raise GitHubError(f"deleteFile: {r['message']}")
