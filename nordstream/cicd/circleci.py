@@ -409,6 +409,117 @@ class CircleCI:
         self._outputDir = value
 
     # ------------------------------------------------------------------
+    # Project discovery by GitHub/GitLab repo
+    # ------------------------------------------------------------------
+
+    def findProjectByRepo(self, repoFullName):
+        """
+        Auto-discover the CircleCI project linked to a GitHub/GitLab repo.
+
+        Scans all organisations the CircleCI token has access to (via
+        /me/collaborations) and within each org scans recent pipelines for one
+        whose trigger_parameters match the given repo full name
+        (e.g. "ScaumAcktiv/testcircleci").
+
+        Returns a dict on success:
+          {
+            "project_slug":     "circleci/H3xy.../RZ3k...",
+            "project_id":       "c6d4d2bc-...",
+            "circle_org":       "H3xy1JwUnkBcQApbzLKwzq",   # slug portion
+            "circle_project":   "RZ3kVnuJPyfqHsaSrRhcCK",   # slug portion
+            "vcs_type":         "circleci",
+            "repo_external_id": "1224368302",
+            "default_branch":   "main",
+          }
+        Returns None if no match is found.
+        """
+        logger.verbose(f"Auto-resolving CircleCI project for repo '{repoFullName}'")
+        try:
+            collabs = self.getCollaborations()
+        except Exception as e:
+            logger.debug(f"Could not fetch collaborations: {e}")
+            return None
+
+        for collab in collabs:
+            org_slug = collab.get("slug", "")   # e.g. "circleci/H3xy1JwUnkBcQApbzLKwzq"
+            logger.verbose(f"Scanning org '{org_slug}' for repo '{repoFullName}'")
+
+            params = {"org-slug": org_slug}
+            next_token = None
+
+            while True:
+                if next_token:
+                    params["page-token"] = next_token
+                r = self._session.get(
+                    f"{CIRCLECI_API_URL}/pipeline",
+                    headers=self._header,
+                    params=params,
+                )
+                if r.status_code != 200:
+                    break
+                data = r.json()
+
+                for pipeline in data.get("items", []):
+                    tp = pipeline.get("trigger_parameters", {})
+                    gh_app = tp.get("github_app", {})
+                    git_params = tp.get("git", {})
+
+                    # Match against github_app.repo_full_name (GitHub App integration)
+                    # or git.repo_url (classic OAuth)
+                    found_name = gh_app.get("repo_full_name")
+                    if not found_name:
+                        # Classic OAuth: extract from repo_url
+                        repo_url = git_params.get("repo_url", "")
+                        parts = repo_url.rstrip("/").split("/")
+                        if len(parts) >= 2:
+                            found_name = "/".join(parts[-2:])
+
+                    if not found_name or found_name.lower() != repoFullName.lower():
+                        continue
+
+                    # Match found — extract identifiers
+                    project_slug = pipeline.get("project_slug", "")
+                    slug_parts = project_slug.split("/")
+                    if len(slug_parts) != 3:
+                        continue
+
+                    vcs_type, circle_org, circle_project = slug_parts
+
+                    # Get the project UUID
+                    project_id = None
+                    details = self.getProjectDetails(project_slug)
+                    if details:
+                        project_id = details.get("id")
+
+                    default_branch = (
+                        gh_app.get("default_branch")
+                        or git_params.get("default_branch")
+                        or "main"
+                    )
+                    repo_external_id = gh_app.get("repo_id")
+
+                    logger.verbose(
+                        f"Resolved: {project_slug} "
+                        f"(org={circle_org}, project={circle_project})"
+                    )
+                    return {
+                        "project_slug":     project_slug,
+                        "project_id":       project_id,
+                        "circle_org":       circle_org,
+                        "circle_project":   circle_project,
+                        "vcs_type":         vcs_type,
+                        "repo_external_id": repo_external_id,
+                        "default_branch":   default_branch,
+                    }
+
+                next_token = data.get("next_page_token")
+                if not next_token:
+                    break
+
+        logger.verbose(f"No CircleCI project found for repo '{repoFullName}'")
+        return None
+
+    # ------------------------------------------------------------------
     # Project details
     # ------------------------------------------------------------------
 

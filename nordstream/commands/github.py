@@ -58,7 +58,7 @@ args:
     --circleci                              Target CircleCI pipelines instead of GitHub Actions
     --circleci-token <cct>                  CircleCI API token (required when --circleci is used)
     --circleci-vcs <vcs>                    CircleCI VCS type: 'gh', 'gl', or 'circleci' for GitHub App / GitLab App
-                                            projects (default: gh)
+                                            projects. Auto-detected from the CircleCI API when omitted.
     --circleci-org <corg>                   CircleCI org name or UUID (defaults to --org value).
                                             Use the org UUID when --circleci-vcs circleci
     --circleci-project <cproject>           CircleCI project name or UUID for a single target project.
@@ -165,8 +165,9 @@ def start(argv):
             logger.critical("Invalid CircleCI token.")
 
         circleCIClient = CircleCI(args["--circleci-token"])
-        # VCS type: default to 'gh' for GitHub; override with --circleci-vcs
-        circleCIVcs = args["--circleci-vcs"] or "gh"
+        # VCS type: None means auto-resolve from the CircleCI API.
+        # Falls back to "gh" in the runner only when the project cannot be found.
+        circleCIVcs = args["--circleci-vcs"] or None
         # Org: default to the GitHub --org value; override with --circleci-org
         circleCIOrg = args["--circleci-org"] or args["--org"]
         circleCIProject = args["--circleci-project"]  # None means "derive from repo name"

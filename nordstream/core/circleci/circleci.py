@@ -44,8 +44,8 @@ class CircleCIRunner:
     _gitCicd = None
     _circleCicd = None
     _vcsType = "gh"
-    _circleOrg = None      # None → derive from git org
-    _circleProject = None  # None → derive from repo short name
+    _circleOrg = None      # None → derive from git org (or auto-resolve)
+    _circleProject = None  # None → derive from repo short name (or auto-resolve)
 
     _yaml = None
     _extractProject = True
@@ -55,12 +55,17 @@ class CircleCIRunner:
     _branchAlreadyExists = False
     _configFilename = DEFAULT_CIRCLECI_CONFIG_FILENAME
 
+    # Cache: "org/repo" → result dict from findProjectByRepo()
+    # Populated on first call, reused for subsequent repos in the same run.
+    _resolvedProjects = {}
+
     def __init__(self, gitCicd, circleCicd, vcsType="gh", circleOrg=None, circleProject=None):
         self._gitCicd = gitCicd
         self._circleCicd = circleCicd
         self._vcsType = vcsType
         self._circleOrg = circleOrg
         self._circleProject = circleProject
+        self._resolvedProjects = {}
         self.__createLogDir()
 
     # ------------------------------------------------------------------
@@ -111,36 +116,87 @@ class CircleCIRunner:
     def __createCircleCIDir():
         makedirs(".circleci", exist_ok=True)
 
+    def __resolveForRepo(self, repo):
+        """
+        Auto-discover the CircleCI project for a GitHub/GitLab repo by scanning
+        the CircleCI API (collaborations → pipeline history).
+
+        Triggered when at least one of _circleOrg / _circleProject / _vcsType
+        is not explicitly provided by the user (i.e. needs to be inferred).
+
+        Results are cached per repo so the API is only called once per run.
+        Returns the dict from findProjectByRepo(), or None if not found.
+        """
+        # If everything is explicitly set, no resolution needed
+        if (self._circleOrg is not None
+                and self._circleProject is not None
+                and self._vcsType is not None):
+            return None
+
+        if repo not in self._resolvedProjects:
+            logger.verbose(f"Auto-resolving CircleCI project for '{repo}'")
+            result = self._circleCicd.findProjectByRepo(repo)
+            self._resolvedProjects[repo] = result
+            if result:
+                logger.verbose(
+                    f"Resolved '{repo}' → {result['project_slug']} "
+                    f"(vcs_type={result['vcs_type']})"
+                )
+            else:
+                logger.warning(
+                    f"Could not find a CircleCI project linked to \"{repo}\". "
+                    f"Provide --circleci-vcs, --circleci-org and --circleci-project "
+                    f"to specify it manually."
+                )
+        return self._resolvedProjects[repo]
+
+    def __effectiveVcsType(self, repo):
+        """
+        Return the VCS type to use for this repo — from the resolved project if
+        auto-discovered, otherwise from the explicit _vcsType (defaulting to "gh").
+        """
+        resolved = self.__resolveForRepo(repo)
+        if resolved:
+            return resolved["vcs_type"]
+        return self._vcsType or "gh"
+
     def __projectSlug(self, repo):
         """
         Build the CircleCI project slug for this repo.
 
         Priority:
-          1. Fully explicit: --circleci-vcs + --circleci-org + --circleci-project
+          1. Auto-resolve via API when vcs/org/project not fully explicit
+             → full project_slug from findProjectByRepo()
+          2. All three explicitly set by user
              → "<vcsType>/<circleOrg>/<circleProject>"
-          2. Org override only (--circleci-org set, --circleci-project not set):
-             → "<vcsType>/<circleOrg>/<repoShortName>"
-          3. Neither override set (default):
-             → "<vcsType>/<gitOrg>/<repoShortName>"
-
-        For classic GitHub/GitLab integrations (vcsType "gh"/"gl") the org and
-        project names match the git repo names.
-        For GitHub App / GitLab App integrations (vcsType "circleci") both must
-        be UUIDs supplied via --circleci-org and --circleci-project.
+          3. Org override only (--circleci-org set, --circleci-project not set):
+             → "<effectiveVcsType>/<circleOrg>/<repoShortName>"
+          4. Nothing set (classic gh/gl where names match):
+             → "<effectiveVcsType>/<gitOrg>/<repoShortName>"
         """
+        resolved = self.__resolveForRepo(repo)
+        if resolved:
+            slug = resolved["project_slug"]
+            logger.verbose(f"CircleCI project slug (auto-resolved): {slug}")
+            return slug
+
         git_org, repo_short = repo.split("/", 1)
+        vcs = self.__effectiveVcsType(repo)
         org = self._circleOrg if self._circleOrg is not None else git_org
         project = self._circleProject if self._circleProject is not None else repo_short
-        slug = f"{self._vcsType}/{org}/{project}"
+        slug = f"{vcs}/{org}/{project}"
         logger.verbose(f"CircleCI project slug: {slug}")
         return slug
 
     def __circleOrgForRepo(self, repo):
         """
         Return the CircleCI org identifier used for context listing.
-        If --circleci-org was supplied, use that (it may be a UUID or slug).
-        Otherwise derive from the git org portion of the repo full name.
+        Uses the auto-resolved org UUID when available, otherwise falls back to
+        the explicit override or the git org name.
         """
+        resolved = self.__resolveForRepo(repo)
+        if resolved:
+            return resolved["circle_org"]
         if self._circleOrg is not None:
             return self._circleOrg
         return repo.split("/")[0]
@@ -188,7 +244,7 @@ class CircleCIRunner:
     def __displayContexts(self, repo):
         orgIdentifier = self.__circleOrgForRepo(repo)
         try:
-            orgId = self._circleCicd.getOrgId(self._vcsType, orgIdentifier)
+            orgId = self._circleCicd.getOrgId(self.__effectiveVcsType(repo), orgIdentifier)
             if not orgId:
                 logger.verbose(f"Could not resolve org ID for {orgIdentifier}")
                 return
@@ -301,7 +357,7 @@ class CircleCIRunner:
         try:
             if self._extractOrg:
                 orgIdentifier = self.__circleOrgForRepo(repo)
-                orgId = self._circleCicd.getOrgId(self._vcsType, orgIdentifier)
+                orgId = self._circleCicd.getOrgId(self.__effectiveVcsType(repo), orgIdentifier)
                 if orgId:
                     contexts = self._circleCicd.listContexts(orgId)
                     contextNames = [c["name"] for c in contexts]
@@ -377,7 +433,7 @@ class CircleCIRunner:
 
         projectSlug = self.__projectSlug(repo)
 
-        if self._vcsType == "circleci":
+        if self.__effectiveVcsType(repo) == "circleci":
             # GitHub App / GitLab App: push already triggered the pipeline.
             # Poll the project's pipeline list to find the one for our branch.
             logger.verbose("GitHub App integration — waiting for auto-triggered pipeline.")
