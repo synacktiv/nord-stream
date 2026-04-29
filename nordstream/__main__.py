@@ -27,6 +27,8 @@ def main():
 
     argv = [args["<command>"]] + args["<args>"]
 
+    # Command modules are imported lazily here to keep startup fast and avoid
+    # loading heavy dependencies (requests, yaml, etc.) for commands not invoked.
     if args["<command>"] == "github":
         import nordstream.commands.github as github
 
@@ -44,7 +46,7 @@ def main():
 
         circleci.start(argv)
     else:
-        logger.error(f"{args['<command>']} is not a nord-stream command.")
+        logger.critical(f"{args['<command>']} is not a nord-stream command.")
 
 
 if __name__ == "__main__":

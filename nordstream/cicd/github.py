@@ -1,3 +1,4 @@
+import base64
 import requests
 import time
 from os import makedirs
@@ -649,11 +650,10 @@ class GitHub:
         existingSHA: required when updating an existing file.
         Returns the blob SHA of the created/updated file.
         """
-        import base64 as _b64
         logger.debug(f"Creating/updating {path} in {repo}@{branch}")
         if isinstance(content, str):
             content = content.encode()
-        encoded = _b64.b64encode(content).decode()
+        encoded = base64.b64encode(content).decode()
         payload = {
             "message": commitMessage,
             "content": encoded,
@@ -687,6 +687,6 @@ class GitHub:
             json=payload,
             auth=self._auth,
             headers=self._header,
-        ).json()
-        if r.get("message") and "commit" not in r:
-            raise GitHubError(f"deleteFile: {r['message']}")
+        )
+        if r.status_code not in (200, 204):
+            raise GitHubError(f"deleteFile: HTTP {r.status_code} — {r.text[:200]}")

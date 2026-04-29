@@ -45,5 +45,9 @@ class YamlGeneratorBase:
         with open(file, "w") as outputFile:
             yaml.dump(self._defaultTemplate, outputFile, sort_keys=False)
 
+    def getYamlContent(self):
+        """Return the current template serialised as a YAML string."""
+        return yaml.dump(self._defaultTemplate, sort_keys=False)
+
     def displayYaml(self):
         logger.raw(yaml.dump(self._defaultTemplate, sort_keys=False), logging.INFO)

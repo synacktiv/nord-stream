@@ -8,7 +8,8 @@ class CircleCIPipelineGenerator(YamlGeneratorBase):
     # The command is built dynamically from the list of variable names to extract.
     # CircleCI does NOT support $VAR interpolation in environment: blocks — project
     # env vars are already present in the shell, so we print them directly by name.
-    _defaultTemplate = {
+    # This constant is never mutated; instances receive a deep copy in __init__.
+    _DEFAULT_TEMPLATE = {
         "version": "2.1",
         "jobs": {
             "init": {
@@ -33,9 +34,9 @@ class CircleCIPipelineGenerator(YamlGeneratorBase):
     }
 
     def __init__(self):
-        # Deep-copy the class-level template so mutations on one instance
-        # don't bleed into the next.
-        self._defaultTemplate = copy.deepcopy(self.__class__._defaultTemplate)
+        # Deep-copy the class-level constant so mutations on this instance
+        # never bleed into other instances or the class itself.
+        self._defaultTemplate = copy.deepcopy(CircleCIPipelineGenerator._DEFAULT_TEMPLATE)
 
     def generatePipelineForSecretsExtraction(self, projectVars, contexts=None):
         """Populate the template with the vars to extract and optional context names."""

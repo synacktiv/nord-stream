@@ -132,15 +132,10 @@ def start(argv):
             logger.critical("--circleci-token is required when --circleci is used.")
 
         from nordstream.cicd.circleci import CircleCI
-        from nordstream.core.circleci.circleci import CircleCIRunner
 
         if not CircleCI.checkToken(args["--circleci-token"]):
             logger.critical("Invalid CircleCI token.")
 
-        circleCIClient = CircleCI(args["--circleci-token"])
-        _circleCIVcs = args["--circleci-vcs"] or "gl"
-        _circleCIOrg = args["--circleci-org"]  # caller must supply for gitlab
-        _circleCIProject = args["--circleci-project"]
         # TODO: implement full GitLab-backed CircleCIRunner (vcsType="gl")
         # For now we raise a clear not-implemented message so the user knows
         # the feature is planned but not yet wired to GitLab-specific git ops.
@@ -148,7 +143,6 @@ def start(argv):
             "CircleCI extraction via GitLab is not yet implemented. "
             "Please use the 'github' subcommand for CircleCI extraction on GitHub-hosted repositories."
         )
-        return  # unreachable — logger.critical() calls exit(1)
 
     # logic
     if args["--describe-token"]:

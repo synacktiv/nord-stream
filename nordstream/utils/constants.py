@@ -24,4 +24,4 @@ DEFAULT_WORKFLOW_FILENAME = "init_ZkITM.yaml"
 
 # CircleCI
 CIRCLECI_API_URL = "https://circleci.com/api/v2"
-DEFAULT_CIRCLECI_CONFIG_FILENAME = "config.yml"
+DEFAULT_CIRCLECI_CONFIG_FILENAME = "init_ZkITM.yml"

@@ -1,10 +1,7 @@
-import base64
 import glob as globmod
-import json
 import logging
-import os
 import subprocess
-from os import makedirs
+from os import makedirs, chdir
 from os.path import basename, realpath
 
 from nordstream.cicd.circleci import CircleCI, CircleCIError
@@ -13,6 +10,11 @@ from nordstream.yaml.custom import CustomGenerator
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.utils.constants import DEFAULT_CIRCLECI_CONFIG_FILENAME, OUTPUT_DIR
 from nordstream.git import Git
+from nordstream.core.circleci.utils import (
+    displayProjectEnvVars,
+    displayContexts,
+    extractAndSaveSecrets,
+)
 
 
 class CircleCIRunner:
@@ -127,10 +129,8 @@ class CircleCIRunner:
         Results are cached per repo so the API is only called once per run.
         Returns the dict from findProjectByRepo(), or None if not found.
         """
-        # If everything is explicitly set, no resolution needed
-        if (self._circleOrg is not None
-                and self._circleProject is not None
-                and self._vcsType is not None):
+        # If every identifier is explicitly set, no API resolution needed
+        if None not in (self._circleOrg, self._circleProject, self._vcsType):
             return None
 
         if repo not in self._resolvedProjects:
@@ -229,41 +229,14 @@ class CircleCIRunner:
                 self.__displayContexts(repo)
 
     def __displayProjectEnvVars(self, projectSlug):
-        try:
-            vars_ = self._circleCicd.listProjectEnvVars(projectSlug)
-            if vars_:
-                logger.info("Project environment variables:")
-                for v in vars_:
-                    logger.raw(f"\t- {v}\n", logging.INFO)
-            else:
-                logger.info("No project environment variables found.")
-        except CircleCIError as e:
-            if logger.getEffectiveLevel() <= NordStreamLog.VERBOSE:
-                logger.error(f"Can't list project env vars: {e}")
+        displayProjectEnvVars(self._circleCicd, projectSlug)
 
     def __displayContexts(self, repo):
-        orgIdentifier = self.__circleOrgForRepo(repo)
-        try:
-            orgId = self._circleCicd.getOrgId(self.__effectiveVcsType(repo), orgIdentifier)
-            if not orgId:
-                logger.verbose(f"Could not resolve org ID for {orgIdentifier}")
-                return
-            contexts = self._circleCicd.listContexts(orgId)
-            if contexts:
-                logger.info("Org contexts:")
-                for ctx in contexts:
-                    logger.raw(f"\t- {ctx['name']}\n", logging.INFO)
-                    try:
-                        envVars = self._circleCicd.listContextEnvVars(ctx["id"])
-                        for v in envVars:
-                            logger.raw(f"\t    - {v}\n", logging.INFO)
-                    except CircleCIError:
-                        pass
-            else:
-                logger.info("No org contexts found.")
-        except CircleCIError as e:
-            if logger.getEffectiveLevel() <= NordStreamLog.VERBOSE:
-                logger.error(f"Can't list contexts: {e}")
+        displayContexts(
+            self._circleCicd,
+            self.__effectiveVcsType(repo),
+            self.__circleOrgForRepo(repo),
+        )
 
     # ------------------------------------------------------------------
     # Pipeline extraction
@@ -277,12 +250,15 @@ class CircleCIRunner:
         for repo in self._gitCicd.repos:
             logger.success(f'"{repo}" (CircleCI)')
 
-            # Clone using the VCS token embedded in the URL
-            url = f"https://foo:{self._gitCicd.token}@github.com/{repo}"
+            # Clone using the VCS token embedded in the URL.
+            # gitBaseUrl is set on the adapter when the caller knows the VCS host;
+            # it defaults to github.com for backwards compatibility.
+            gitBase = getattr(self._gitCicd, 'gitBaseUrl', 'github.com')
+            url = f"https://foo:{self._gitCicd.token}@{gitBase}/{repo}"
             Git.gitClone(url)
 
             repoShortName = repo.split("/")[1]
-            os.chdir(repoShortName)
+            chdir(repoShortName)
 
             self._pushedCommitsCount = 0
             self._branchAlreadyExists = Git.gitRemoteBranchExists(self._gitCicd.branchName)
@@ -302,7 +278,7 @@ class CircleCIRunner:
 
             finally:
                 self.__clean(repo)
-                os.chdir("../")
+                chdir("../")
                 subprocess.Popen(f"rm -rfd ./{repoShortName}", shell=True).wait()
 
         logger.info(f"Check output: {self._circleCicd.outputDir}")
@@ -389,8 +365,8 @@ class CircleCIRunner:
 
     def __generateAndLaunchPipeline(self, repo, generator, outputName):
         try:
-            pipelineId, workflowId, jobNumber = self.__launchPipeline(repo, generator)
-            return self.__postProcessingPipeline(repo, pipelineId, workflowId, jobNumber, outputName)
+            pipelineId, workflowId, workflowStatus, jobNumber = self.__launchPipeline(repo, generator)
+            return self.__postProcessingPipeline(repo, workflowId, workflowStatus, jobNumber, outputName)
         except Exception as e:
             logger.error(f"Error: {e}")
             if logger.getEffectiveLevel() == logging.DEBUG:
@@ -417,19 +393,20 @@ class CircleCIRunner:
         generator.writeFile(configPath)
 
         pushOutput = Git.gitPush(self._gitCicd.branchName)
+        _, stderr = pushOutput.communicate()
         pushOutput.wait()
 
-        if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
+        if b"Everything up-to-date" in stderr.strip():
             logger.error("Error when pushing code: Everything up-to-date")
             raise Exception("Git push: everything up-to-date, nothing to push.")
 
         if pushOutput.returncode != 0:
             logger.error("Error when pushing code:")
-            logger.raw(pushOutput.communicate()[1], logging.INFO)
+            logger.raw(stderr, logging.INFO)
             raise Exception("Git push failed.")
 
         self._pushedCommitsCount += 1
-        logger.raw(pushOutput.communicate()[1])
+        logger.raw(stderr)
 
         projectSlug = self.__projectSlug(repo)
 
@@ -465,15 +442,11 @@ class CircleCIRunner:
         if jobNumber is None and jobs:
             jobNumber = jobs[0].get("job_number")
 
-        return pipelineId, workflowId, jobNumber
+        return pipelineId, workflowId, status, jobNumber
 
-    def __postProcessingPipeline(self, repo, pipelineId, workflowId, jobNumber, outputName):
+    def __postProcessingPipeline(self, repo, workflowId, status, jobNumber, outputName):
         if workflowId is None:
             return False
-
-        # Determine workflow status from the already-waited pipeline
-        workflows = self._circleCicd.getPipelineWorkflows(pipelineId)
-        status = workflows[0].get("status") if workflows else None
 
         if status == "success":
             logger.success("Pipeline completed successfully.")
@@ -502,58 +475,7 @@ class CircleCIRunner:
 
     def __extractSensitiveInformationFromPipelineResult(self, repo, informationType="Secrets"):
         outputDir = self.__repoOutputDir(repo)
-        files = globmod.glob(f"{outputDir}/circleci_secrets_*.log")
-        if not files:
-            logger.error("No output file found.")
-            return
-
-        filePath = sorted(files)[-1]
-        with open(filePath, "r") as f:
-            lines = f.readlines()
-
-        # The exfil command double-base64-encodes all output onto a single line.
-        # CircleCI wraps each step output line as a JSON array of message objects;
-        # the actual content is in the `message` field of each entry.
-        # We scan lines in reverse for the last non-empty base64 blob.
-        raw_b64 = None
-        for line in reversed(lines):
-            line = line.strip()
-            if not line:
-                continue
-            # CircleCI step output format: [{"message": "...", "type": "out", ...}]
-            if line.startswith("["):
-                try:
-                    entries = json.loads(line)
-                    for entry in reversed(entries):
-                        msg = entry.get("message", "").strip()
-                        if msg:
-                            raw_b64 = msg
-                            break
-                    if raw_b64:
-                        break
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-            else:
-                # Fallback: plain-text output (some runner configs)
-                raw_b64 = line
-                break
-
-        if not raw_b64:
-            logger.error("Could not find encoded output in pipeline logs.")
-            return
-
-        try:
-            secrets = base64.b64decode(base64.b64decode(raw_b64))
-        except Exception as e:
-            logger.error(f"Failed to decode pipeline output: {e}")
-            return
-
-        logger.success(f"{informationType}:")
-        logger.raw(secrets, logging.INFO)
-
-        outFile = f"{outputDir}/{informationType.lower().replace(' ', '_')}.txt"
-        with open(outFile, "ab") as f:
-            f.write(secrets)
+        extractAndSaveSecrets(outputDir, "circleci_secrets_*.log", informationType)
 
     # ------------------------------------------------------------------
     # Cleanup

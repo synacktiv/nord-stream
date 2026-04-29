@@ -56,6 +56,8 @@ Authors: @hugow @0hexit
 
 from docopt import docopt
 from nordstream.cicd.circleci import CircleCI
+from nordstream.cicd.github import GitHub
+from nordstream.cicd.gitlab import GitLab
 from nordstream.core.circleci.standalone import CircleCIStandaloneRunner
 from nordstream.utils.log import logger, NordStreamLog
 
@@ -102,7 +104,7 @@ def start(argv):
 
     # --- Build git client if --git-token is provided ---
     gitClient = None
-    gitOrg = org  # default: use CircleCI org name as git org name
+    gitOrg = org  # default: use CircleCI org slug/UUID as the git org name
 
     if args["--git-token"]:
         gitToken = args["--git-token"]
@@ -110,22 +112,22 @@ def start(argv):
 
         if vcsType == "gl":
             # GitLab client
-            from nordstream.cicd.gitlab import GitLab
+            logger.warning(
+                "GitLab standalone CircleCI extraction is experimental. "
+                "The GitLab App provider mapping may not be correct for all setups."
+            )
             gitLabUrl = gitApiUrl or "https://gitlab.com"
             if not GitLab.checkToken(gitToken, gitLabUrl):
                 logger.critical("Invalid GitLab token.")
             gitClient = GitLab(gitLabUrl, gitToken)
         else:
             # GitHub client (for both "gh" and "circleci" vcsType)
-            from nordstream.cicd.github import GitHub
             if not GitHub.checkToken(gitToken):
                 logger.critical("Invalid GitHub token.")
             gitClient = GitHub(gitToken)
             if gitApiUrl:
                 # Allow overriding the GitHub API base URL for GHES
                 gitClient._repoURL = gitApiUrl.rstrip("/") + "/repos"
-            # Use GitHub org name from token if available, else fall back to org arg
-            gitOrg = org
 
     # --- Extraction requires a git client ---
     if not args["--list-secrets"] and gitClient is None:
@@ -143,18 +145,14 @@ def start(argv):
         gitOrg=gitOrg,
     )
 
-    if args["--no-repo"]:
-        runner.extractProject = False
-    if args["--no-org"]:
-        runner.extractOrg = False
-    if args["--no-clean"]:
-        runner.cleanLogs = False
+    runner.extractProject = not args["--no-repo"]
+    runner.extractOrg = not args["--no-org"]
+    runner.cleanLogs = not args["--no-clean"]
     if args["--yaml"]:
         runner.yaml = args["--yaml"]
 
     # --- Discover / load projects ---
-    if not args["--describe-token"]:
-        runner.loadProjects(repoOverride=args["--repo"])
+    runner.loadProjects(repoOverride=args["--repo"])
 
     # --- Dispatch ---
     if args["--list-secrets"]:

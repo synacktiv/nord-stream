@@ -14,13 +14,11 @@ The only credentials needed are:
   - For --list-secrets and --describe-token: only the CircleCI token
 """
 
-import base64
 import glob as globmod
-import json
 import logging
-import time
+import urllib.parse
 from os import makedirs
-from os.path import realpath
+from os.path import basename, realpath
 
 from nordstream.cicd.circleci import CircleCI, CircleCIError
 from nordstream.yaml.circleci import CircleCIPipelineGenerator
@@ -32,6 +30,11 @@ from nordstream.utils.constants import (
     OUTPUT_DIR,
     GIT_ATTACK_COMMIT_MSG,
     GIT_CLEAN_COMMIT_MSG,
+)
+from nordstream.core.circleci.utils import (
+    displayProjectEnvVars,
+    displayContexts,
+    extractAndSaveSecrets,
 )
 
 
@@ -123,10 +126,6 @@ class CircleCIStandaloneRunner:
         makedirs(path, exist_ok=True)
         return path
 
-    def __configFilename(self):
-        """Use the same obfuscated filename as the rest of nord-stream."""
-        return DEFAULT_CIRCLECI_CONFIG_FILENAME
-
     def __configFilePath(self):
         return f".circleci/{DEFAULT_CIRCLECI_CONFIG_FILENAME}"
 
@@ -163,26 +162,21 @@ class CircleCIStandaloneRunner:
             details = self._circleCicd.getProjectDetails(projectSlug)
             if not details:
                 logger.critical(f"Project not found: {projectSlug}")
+                return  # logger.critical() calls sys.exit(1); this is a safety guard
 
             # Try to recover repo_full_name from recent pipelines
             repo_full_name = None
             repo_external_id = None
             default_branch = details.get("vcs_info", {}).get("default_branch", "main")
 
-            pipelines = self._circleCicd._session.get(
-                f"https://circleci.com/api/v2/project/{projectSlug}/pipeline",
-                headers=self._circleCicd._header,
-                params={"limit": 5},
-            )
-            if pipelines.status_code == 200:
-                for p in pipelines.json().get("items", [])[:5]:
-                    tp = p.get("trigger_parameters", {})
-                    gh = tp.get("github_app", {})
-                    if gh.get("repo_full_name"):
-                        repo_full_name = gh["repo_full_name"]
-                        repo_external_id = gh.get("repo_id")
-                        default_branch = gh.get("default_branch", default_branch)
-                        break
+            for p in self._circleCicd.getRecentProjectPipelines(projectSlug):
+                tp = p.get("trigger_parameters", {})
+                gh = tp.get("github_app", {})
+                if gh.get("repo_full_name"):
+                    repo_full_name = gh["repo_full_name"]
+                    repo_external_id = gh.get("repo_id")
+                    default_branch = gh.get("default_branch", default_branch)
+                    break
 
             if not repo_full_name:
                 # Fall back: construct from org + repo slug (works for gh/gl types)
@@ -201,6 +195,7 @@ class CircleCIStandaloneRunner:
             self._projects = self._circleCicd.listProjectsForOrg(orgSlug)
             if not self._projects:
                 logger.critical(f"No projects found for org '{orgSlug}'")
+                return  # logger.critical() calls sys.exit(1); this is a safety guard
             logger.info(f"Found {len(self._projects)} project(s)")
 
     # ------------------------------------------------------------------
@@ -220,40 +215,10 @@ class CircleCIStandaloneRunner:
                 self.__displayContexts()
 
     def __displayProjectEnvVars(self, projectSlug):
-        try:
-            vars_ = self._circleCicd.listProjectEnvVars(projectSlug)
-            if vars_:
-                logger.info("Project environment variables:")
-                for v in vars_:
-                    logger.raw(f"\t- {v}\n", logging.INFO)
-            else:
-                logger.info("No project environment variables found.")
-        except CircleCIError as e:
-            if logger.getEffectiveLevel() <= NordStreamLog.VERBOSE:
-                logger.error(f"Can't list project env vars: {e}")
+        displayProjectEnvVars(self._circleCicd, projectSlug)
 
     def __displayContexts(self):
-        try:
-            orgId = self._circleCicd.getOrgId(self._vcsType, self._org)
-            if not orgId:
-                logger.verbose(f"Could not resolve org ID for {self._org}")
-                return
-            contexts = self._circleCicd.listContexts(orgId)
-            if contexts:
-                logger.info("Org contexts:")
-                for ctx in contexts:
-                    logger.raw(f"\t- {ctx['name']}\n", logging.INFO)
-                    try:
-                        envVars = self._circleCicd.listContextEnvVars(ctx["id"])
-                        for v in envVars:
-                            logger.raw(f"\t    - {v}\n", logging.INFO)
-                    except CircleCIError:
-                        pass
-            else:
-                logger.info("No org contexts found.")
-        except CircleCIError as e:
-            if logger.getEffectiveLevel() <= NordStreamLog.VERBOSE:
-                logger.error(f"Can't list contexts: {e}")
+        displayContexts(self._circleCicd, self._vcsType, self._org)
 
     # ------------------------------------------------------------------
     # Extraction
@@ -295,7 +260,6 @@ class CircleCIStandaloneRunner:
     # ------------------------------------------------------------------
 
     def __runCustomPipeline(self, proj):
-        from os.path import basename
         logger.info(f"Running custom CircleCI pipeline: {self._yaml}")
 
         with open(self._yaml, "r") as f:
@@ -352,11 +316,7 @@ class CircleCIStandaloneRunner:
         generator = CircleCIPipelineGenerator()
         generator.generatePipelineForSecretsExtraction(projectVars, contextNames)
 
-        import io
-        import yaml as _yaml
-        buf = io.StringIO()
-        _yaml.dump(generator._defaultTemplate, buf, sort_keys=False)
-        content = buf.getvalue()
+        content = generator.getYamlContent()
 
         configPath = self.__configFilePath()
 
@@ -500,7 +460,6 @@ class CircleCIStandaloneRunner:
 
     def __resolveGitLabProjectId(self, repoFullName):
         """Encode the full project path for GitLab API calls."""
-        import urllib.parse
         return urllib.parse.quote(repoFullName, safe="")
 
     def __cleanup(self, repoFullName, configPath, fileSHA, branch,
@@ -538,49 +497,4 @@ class CircleCIStandaloneRunner:
     # ------------------------------------------------------------------
 
     def __extractSensitiveInformation(self, outputDir, informationType="Secrets"):
-        files = globmod.glob(f"{outputDir}/circleci_secrets_*.log")
-        if not files:
-            logger.error("No output file found.")
-            return
-
-        filePath = sorted(files)[-1]
-        with open(filePath, "r") as f:
-            lines = f.readlines()
-
-        raw_b64 = None
-        for line in reversed(lines):
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("["):
-                try:
-                    entries = json.loads(line)
-                    for entry in reversed(entries):
-                        msg = entry.get("message", "").strip()
-                        if msg:
-                            raw_b64 = msg
-                            break
-                    if raw_b64:
-                        break
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-            else:
-                raw_b64 = line
-                break
-
-        if not raw_b64:
-            logger.error("Could not find encoded output in pipeline logs.")
-            return
-
-        try:
-            secrets = base64.b64decode(base64.b64decode(raw_b64))
-        except Exception as e:
-            logger.error(f"Failed to decode pipeline output: {e}")
-            return
-
-        logger.success(f"{informationType}:")
-        logger.raw(secrets, logging.INFO)
-
-        outFile = f"{outputDir}/{informationType.lower().replace(' ', '_')}.txt"
-        with open(outFile, "ab") as f:
-            f.write(secrets)
+        extractAndSaveSecrets(outputDir, "circleci_secrets_*.log", informationType)

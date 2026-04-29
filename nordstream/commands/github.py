@@ -85,7 +85,9 @@ Authors: @hugow @0hexit
 
 from docopt import docopt
 from nordstream.cicd.github import GitHub
+from nordstream.cicd.circleci import CircleCI
 from nordstream.core.github.github import GitHubWorkflowRunner
+from nordstream.core.circleci.circleci import CircleCIRunner
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 
@@ -158,9 +160,6 @@ def start(argv):
         if not args["--circleci-token"]:
             logger.critical("--circleci-token is required when --circleci is used.")
 
-        from nordstream.cicd.circleci import CircleCI
-        from nordstream.core.circleci.circleci import CircleCIRunner
-
         if not CircleCI.checkToken(args["--circleci-token"]):
             logger.critical("Invalid CircleCI token.")
 
@@ -181,14 +180,11 @@ def start(argv):
             circleProject=circleCIProject,
         )
 
-        if args["--no-repo"]:
-            circleCIRunner.extractProject = not args["--no-repo"]
-        if args["--no-org"]:
-            circleCIRunner.extractOrg = not args["--no-org"]
+        circleCIRunner.extractProject = not args["--no-repo"]
+        circleCIRunner.extractOrg = not args["--no-org"]
+        circleCIRunner.cleanLogs = not args["--no-clean"]
         if args["--yaml"]:
             circleCIRunner.yaml = args["--yaml"]
-        if args["--no-clean"]:
-            circleCIRunner.cleanLogs = not args["--no-clean"]
 
         gitHubWorkflowRunner.circleCIRunner = circleCIRunner
 

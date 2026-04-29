@@ -1,3 +1,4 @@
+import re
 import requests
 import time
 from os import makedirs
@@ -70,14 +71,15 @@ class CircleCI:
     # Organisation helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _isRFC4122UUID(value):
+    _UUID_RE = re.compile(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        re.I,
+    )
+
+    @classmethod
+    def _isRFC4122UUID(cls, value):
         """Return True only for standard 8-4-4-4-12 hex UUID strings."""
-        import re
-        return bool(re.match(
-            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-            value, re.I
-        ))
+        return bool(cls._UUID_RE.match(value))
 
     def getCollaborations(self):
         """
@@ -199,7 +201,6 @@ class CircleCI:
         """
         logger.debug(f"Listing contexts for org {orgIdOrSlug}")
         contexts = []
-        url = f"{CIRCLECI_API_URL}/context"
 
         # Decide whether to use owner-id or owner-slug
         if "/" in str(orgIdOrSlug):
@@ -207,8 +208,8 @@ class CircleCI:
         else:
             params = {"owner-id": orgIdOrSlug}
 
-        while url:
-            r = self._session.get(url, headers=self._header, params=params)
+        while True:
+            r = self._session.get(f"{CIRCLECI_API_URL}/context", headers=self._header, params=params)
             if r.status_code in (401, 403):
                 raise CircleCIError("Not authorised to list contexts.")
             r.raise_for_status()
@@ -216,12 +217,9 @@ class CircleCI:
             for ctx in data.get("items", []):
                 contexts.append({"id": ctx.get("id"), "name": ctx.get("name")})
             next_token = data.get("next_page_token")
-            if next_token:
-                base_params = dict(params)
-                base_params["page-token"] = next_token
-                params = base_params
-            else:
-                url = None
+            if not next_token:
+                break
+            params = {**params, "page-token": next_token}
 
         return contexts
 
@@ -339,10 +337,12 @@ class CircleCI:
     def cancelWorkflow(self, workflowId):
         """Request cancellation of a workflow."""
         logger.debug(f"Cancelling workflow {workflowId}")
-        self._session.post(
+        r = self._session.post(
             f"{CIRCLECI_API_URL}/workflow/{workflowId}/cancel",
             headers=self._header,
         )
+        if r.status_code not in (200, 202):
+            logger.verbose(f"cancelWorkflow returned HTTP {r.status_code} for {workflowId}")
 
     # ------------------------------------------------------------------
     # Job output
@@ -522,6 +522,22 @@ class CircleCI:
     # ------------------------------------------------------------------
     # Project details
     # ------------------------------------------------------------------
+
+    def getRecentProjectPipelines(self, projectSlug, limit=5):
+        """
+        Return the most recent pipeline dicts for a project.
+        Used to extract VCS metadata (repo name, external ID) from trigger_parameters.
+        """
+        logger.debug(f"Fetching recent pipelines for {projectSlug}")
+        r = self._session.get(
+            f"{CIRCLECI_API_URL}/project/{projectSlug}/pipeline",
+            headers=self._header,
+            params={"limit": limit},
+        )
+        if r.status_code == 404:
+            return []
+        r.raise_for_status()
+        return r.json().get("items", [])
 
     def getProjectDetails(self, projectSlug):
         """
@@ -711,10 +727,14 @@ class CircleCI:
     def deletePipelineDefinition(self, projectId, definitionId):
         """Delete a pipeline definition by its UUID."""
         logger.debug(f"Deleting pipeline definition {definitionId} from project {projectId}")
-        self._session.delete(
+        r = self._session.delete(
             f"{CIRCLECI_API_URL}/projects/{projectId}/pipeline-definitions/{definitionId}",
             headers=self._header,
         )
+        if r.status_code not in (200, 204):
+            raise CircleCIError(
+                f"deletePipelineDefinition: HTTP {r.status_code} for {definitionId}"
+            )
 
     def triggerPipelineRun(self, projectSlug, definitionId, branch):
         """
@@ -724,7 +744,10 @@ class CircleCI:
         """
         logger.debug(f"Triggering pipeline/run for {projectSlug} def={definitionId} branch={branch}")
         # The slug format for this endpoint is {provider}/{org}/{project}
-        provider, org, project = projectSlug.split("/", 2)
+        parts = projectSlug.split("/", 2)
+        if len(parts) != 3:
+            raise CircleCIError(f"triggerPipelineRun: invalid project slug '{projectSlug}'")
+        provider, org, project = parts
         payload = {
             "definition_id": definitionId,
             "config": {"branch": branch},
