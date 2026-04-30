@@ -19,6 +19,9 @@ from nordstream.utils.constants import DEFAULT_WORKFLOW_FILENAME
 from nordstream.git import Git
 import subprocess
 
+# CircleCI support (optional — only imported when --circleci is used)
+from nordstream.core.circleci.circleci import CircleCIRunner
+
 
 class GitHubWorkflowRunner:
     _cicd = None
@@ -42,6 +45,8 @@ class GitHubWorkflowRunner:
     _branchAlreadyExists = False
     _pushedCommitsCount = 0
     _cleanLogs = True
+    # CircleCI — set by commands/github.py when --circleci is supplied
+    _circleCIRunner = None
 
     def __init__(self, cicd, env):
         self._cicd = cicd
@@ -183,6 +188,14 @@ class GitHubWorkflowRunner:
     @cleanLogs.setter
     def cleanLogs(self, value):
         self._cleanLogs = value
+
+    @property
+    def circleCIRunner(self):
+        return self._circleCIRunner
+
+    @circleCIRunner.setter
+    def circleCIRunner(self, value):
+        self._circleCIRunner = value
 
     def __createLogDir(self):
         self._cicd.outputDir = realpath(self._cicd.outputDir) + "/github"
@@ -422,6 +435,11 @@ class GitHubWorkflowRunner:
             logger.raw(f"- {r}\n", level=logging.INFO)
 
     def listGitHubSecrets(self):
+        # Delegate to CircleCI secret listing when --circleci is active.
+        if self._circleCIRunner is not None:
+            self._circleCIRunner.listCircleCISecrets()
+            return
+
         logger.info("Listing secrets:")
         if self._extractOrg:
             self.__displayDependabotOrgSecrets()
@@ -594,6 +612,10 @@ class GitHubWorkflowRunner:
                     Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
 
     def start(self):
+        # If a CircleCIRunner has been attached, hand off entirely to it.
+        if self._circleCIRunner is not None:
+            self._circleCIRunner.start()
+            return
 
         for repo in self._cicd.repos:
             logger.success(f'"{repo}"')

@@ -12,6 +12,9 @@ Usage:
     nord-stream github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream github [options] --token <ghp> --describe-token
+    nord-stream github [options] --token <ghp> --org <org> --circleci [--repo <repo> --no-repo --no-org --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --circleci --yaml <yaml> --repo <repo> [--branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --circleci --list-secrets [--repo <repo> --no-repo --no-org]
 
 Options:
     -h --help                               Show this screen.
@@ -52,6 +55,14 @@ args:
     --force                                 Don't check environment and branch protections.
     --branch-name <name>                    Use specific branch name for deployment.
     --describe-token                        Display information on the token
+    --circleci                              Target CircleCI pipelines instead of GitHub Actions
+    --circleci-token <cct>                  CircleCI API token (required when --circleci is used)
+    --circleci-vcs <vcs>                    CircleCI VCS type: 'gh', 'gl', or 'circleci' for GitHub App / GitLab App
+                                            projects. Auto-detected from the CircleCI API when omitted.
+    --circleci-org <corg>                   CircleCI org name or UUID (defaults to --org value).
+                                            Use the org UUID when --circleci-vcs circleci
+    --circleci-project <cproject>           CircleCI project name or UUID for a single target project.
+                                            Use the project UUID when --circleci-vcs circleci
 
 Examples:
     List all secrets from all repositories
@@ -60,12 +71,23 @@ Examples:
     Dump all secrets from all repositories and try to disable branch protections
     $ nord-stream github --token "$GHP" --org myorg --disable-protections
 
+    List CircleCI secrets (project env vars + contexts) for all repositories
+    $ nord-stream github --token "$GHP" --org myorg --circleci --circleci-token "$CCT" --list-secrets
+
+    Dump CircleCI secrets from all repositories
+    $ nord-stream github --token "$GHP" --org myorg --circleci --circleci-token "$CCT"
+
+    Dump CircleCI secrets — GitHub App integration (org/project UUIDs, vcs=circleci)
+    $ nord-stream github --token "$GHP" --org myorg --repo myrepo --circleci --circleci-token "$CCT" --circleci-vcs circleci --circleci-org <org-uuid> --circleci-project <project-uuid>
+
 Authors: @hugow @0hexit
 """
 
 from docopt import docopt
 from nordstream.cicd.github import GitHub
+from nordstream.cicd.circleci import CircleCI
 from nordstream.core.github.github import GitHubWorkflowRunner
+from nordstream.core.circleci.circleci import CircleCIRunner
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.git import Git
 
@@ -132,6 +154,39 @@ def start(argv):
         gitHubWorkflowRunner.region = args["--aws-region"]
     if args["--no-clean"]:
         gitHubWorkflowRunner.cleanLogs = not args["--no-clean"]
+
+    # CircleCI mode — attach a CircleCIRunner to the workflow runner
+    if args["--circleci"]:
+        if not args["--circleci-token"]:
+            logger.critical("--circleci-token is required when --circleci is used.")
+
+        if not CircleCI.checkToken(args["--circleci-token"]):
+            logger.critical("Invalid CircleCI token.")
+
+        circleCIClient = CircleCI(args["--circleci-token"])
+        # VCS type: None means auto-resolve from the CircleCI API.
+        # Falls back to "gh" in the runner only when the project cannot be found.
+        circleCIVcs = args["--circleci-vcs"] or None
+        # Org: default to the GitHub --org value; override with --circleci-org
+        circleCIOrg = args["--circleci-org"] or args["--org"]
+        circleCIProject = args["--circleci-project"]  # None means "derive from repo name"
+        # Note: docopt stores --circleci-org as args["--circleci-org"] and
+        #       --circleci-project as args["--circleci-project"] regardless of metavar
+
+        circleCIRunner = CircleCIRunner(
+            gitHub, circleCIClient,
+            vcsType=circleCIVcs,
+            circleOrg=circleCIOrg,
+            circleProject=circleCIProject,
+        )
+
+        circleCIRunner.extractProject = not args["--no-repo"]
+        circleCIRunner.extractOrg = not args["--no-org"]
+        circleCIRunner.cleanLogs = not args["--no-clean"]
+        if args["--yaml"]:
+            circleCIRunner.yaml = args["--yaml"]
+
+        gitHubWorkflowRunner.circleCIRunner = circleCIRunner
 
     # logic
     if args["--describe-token"]:
