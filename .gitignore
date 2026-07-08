@@ -8,3 +8,6 @@ build/
 nord-stream-logs/
 notes.md
 .vscode
+.pytest_cache/
+.coverage
+htmlcov/

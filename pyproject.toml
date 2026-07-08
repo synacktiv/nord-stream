@@ -12,3 +12,11 @@ dependencies = ["docopt", "PyYAML", "requests", "rich"]
 
 [project.scripts]
 nord-stream = "nordstream.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "responses"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra"
