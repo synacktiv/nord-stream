@@ -527,18 +527,30 @@ class DevOps:
                 json={},
             ).json()
 
+            records = buildTimeline.get("records", [])
+
+            # 1. Try to find it by the exact task name first
             logs = [
                 record["log"]["id"]
-                for record in buildTimeline["records"]
-                if record["name"] == DevOpsPipelineGenerator.taskName
+                for record in records
+                if record.get("name") == DevOpsPipelineGenerator.taskName and record.get("log")
             ]
-            if len(logs) != 0:
-                break
 
-            # if there are logs but we didn't find the taskName get the last
-            # job as it contain all data
-            if len(buildTimeline["records"]) > 0:
-                logs = [buildTimeline["records"][-1]["log"]["id"]]
+            # 2. Fallback: Prendre la tâche utilisateur avec l'ID de log MAXIMUM
+            if len(logs) == 0:
+                user_task_log_ids = [
+                    record["log"]["id"]
+                    for record in records
+                    if record.get("type") == "Task"
+                    and record.get("log")
+                    and record.get("task")
+                ]
+                
+                # Si on a trouvé des tâches utilisateur, on garde celle avec le plus grand ID
+                if len(user_task_log_ids) > 0:
+                    logs = [max(user_task_log_ids)]
+
+            if len(logs) > 0:
                 break
 
             if i == (self._maxRetry - 1):
