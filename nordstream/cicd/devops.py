@@ -1,6 +1,7 @@
 import requests
 import time
 from os import makedirs
+from nordstream.cicd.base import BaseClient
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.git import Git
@@ -12,33 +13,24 @@ from nordstream.utils.helpers import isAZDOBearerToken
 requests.packages.urllib3.disable_warnings()
 
 
-class DevOps:
+class DevOps(BaseClient):
     _DEFAULT_PIPELINE_NAME = DEFAULT_PIPELINE_NAME
-    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
-    _token = None
-    _auth = None
-    _org = None
-    _devopsLoginId = None
-    _projects = []
     _baseURL = "https://dev.azure.com/"
     _header = {
         "Accept": "application/json; api-version=6.0-preview",
         "User-Agent": USER_AGENT,
     }
-    _session = None
-    _repoName = DEFAULT_REPO_NAME
-    _outputDir = OUTPUT_DIR
-    _pipelineName = _DEFAULT_PIPELINE_NAME
-    _branchName = _DEFAULT_BRANCH_NAME
-    _defaultAgentPool = None
     _sleepTime = 15
     _maxRetry = 10
 
     def __init__(self, token, org, verifCert):
-        self._token = token
+        super().__init__(token)
         self._org = org
-        self._baseURL += f"{org}/"
-        self._session = requests.Session()
+        self._baseURL = self._baseURL + f"{org}/"
+        self._projects = []
+        self._repoName = DEFAULT_REPO_NAME
+        self._pipelineName = self._DEFAULT_PIPELINE_NAME
+        self._defaultAgentPool = None
         self.setCookiesAndHeaders()
         self._session.verify = verifCert
         self._devopsLoginId = self.__getLogin()
@@ -50,14 +42,6 @@ class DevOps:
     @property
     def org(self):
         return self._org
-
-    @property
-    def branchName(self):
-        return self._branchName
-
-    @branchName.setter
-    def branchName(self, value):
-        self._branchName = value
 
     @property
     def repoName(self):
@@ -92,24 +76,8 @@ class DevOps:
         self._sleepTime = int(value)
 
     @property
-    def token(self):
-        return self._token
-
-    @property
-    def outputDir(self):
-        return self._outputDir
-
-    @outputDir.setter
-    def outputDir(self, value):
-        self._outputDir = value
-
-    @property
     def defaultPipelineName(self):
         return self._DEFAULT_PIPELINE_NAME
-
-    @property
-    def defaultBranchName(self):
-        return self._DEFAULT_BRANCH_NAME
 
     def __getLogin(self):
         return self.getUser().get("authenticatedUser").get("id")
@@ -400,34 +368,33 @@ class DevOps:
             queues_url = f"{self._baseURL}/{project}/_apis/distributedtask/queues"
             response = self._session.get(queues_url)
             queues = response.json()
-            
+
             queue_id = None
             queue_name = None
-            for queue in queues['value']:
-                if queue['pool']['name'] == self._defaultAgentPool:
-                    queue_id = queue['id']
-                    queue_name = queue['name']
+            for queue in queues["value"]:
+                if queue["pool"]["name"] == self._defaultAgentPool:
+                    queue_id = queue["id"]
+                    queue_name = queue["name"]
                     logger.info(f"Queue found : {queue_name} (Queue ID: {queue_id}, Pool ID: {queue['pool']['id']})")
                     break
-            
+
             if not queue_id:
-                logger.error(f"Queue {self._defaultAgentPool} not found for default agent pool, or not accessible by the project. Not updating")
+                logger.error(
+                    f"Queue {self._defaultAgentPool} not found for default agent pool, or not accessible by the project. Not updating"
+                )
                 return pipeline_id
 
-            # Update pipeline Default agent with specified queue, via the definitions API 
+            # Update pipeline Default agent with specified queue, via the definitions API
             update_url = f"{self._baseURL}/{project}/_apis/build/definitions/{pipeline_id}"
 
             response = self._session.get(update_url)
             definition = response.json()
 
             # Add default pool agent with queue
-            definition['queue'] = {
-                'id': queue_id,
-                'name': queue_name
-            }
+            definition["queue"] = {"id": queue_id, "name": queue_name}
 
             response = self._session.put(update_url, json=definition)
-        
+
         return pipeline_id
 
     def runPipeline(self, project, pipelineId):
@@ -541,11 +508,9 @@ class DevOps:
                 user_task_log_ids = [
                     record["log"]["id"]
                     for record in records
-                    if record.get("type") == "Task"
-                    and record.get("log")
-                    and record.get("task")
+                    if record.get("type") == "Task" and record.get("log") and record.get("task")
                 ]
-                
+
                 # Si on a trouvé des tâches utilisateur, on garde celle avec le plus grand ID
                 if len(user_task_log_ids) > 0:
                     logs = [max(user_task_log_ids)]
@@ -683,26 +648,25 @@ class DevOps:
             url = "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1"
 
             # Headers with authentication and content type
-            headers = {
-                'Authorization': f'Bearer {token}',
-                'Content-Type': 'application/json'
-            }
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
             response = requests.get(url, headers=headers)
 
             # Check if request was successful
             response.raise_for_status()
-            
+
             # Parse and print the JSON response
             data = response.json()
-            
+
             # Get organizations URL from profile response
-            orgs_url = "https://app.vssps.visualstudio.com/_apis/accounts?memberId={}?api-version=7.1".format(data['id'])
-            
+            orgs_url = "https://app.vssps.visualstudio.com/_apis/accounts?memberId={}?api-version=7.1".format(
+                data["id"]
+            )
+
             # Get organizations
             orgs_response = requests.get(orgs_url, headers=headers)
             orgs_response.raise_for_status()
-            
+
             return orgs_response.json()
         else:
             raise DevOpsError("Only access token can be used for this operation.")
