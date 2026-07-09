@@ -25,71 +25,15 @@ from nordstream.report.gitlab import (
 
 
 class GitLabRunner(BaseRunner):
-    _writeAccessFilter = False
-    _extractProject = True
-    _extractGroup = True
-    _extractInstance = True
-    _yaml = None
-    _fileName = None
-    _cleanLogs = True
+    extractProject = True
+    extractGroup = True
+    extractInstance = True
     _sleepTime = 0
     _localPath = None
 
-    @property
-    def writeAccessFilter(self):
-        return self._writeAccessFilter
-
-    @writeAccessFilter.setter
-    def writeAccessFilter(self, value):
-        self._writeAccessFilter = value
-
-    @property
-    def extractProject(self):
-        return self._extractProject
-
-    @extractProject.setter
-    def extractProject(self, value):
-        self._extractProject = value
-
-    @property
-    def extractGroup(self):
-        return self._extractGroup
-
-    @extractGroup.setter
-    def extractGroup(self, value):
-        self._extractGroup = value
-
-    @property
-    def extractInstance(self):
-        return self._extractInstance
-
-    @extractInstance.setter
-    def extractInstance(self, value):
-        self._extractInstance = value
-
-    @property
-    def yaml(self):
-        return self._yaml
-
-    @yaml.setter
-    def yaml(self, value):
-        self._yaml = realpath(value)
-
-    @property
-    def branchAlreadyExists(self):
-        return self._branchAlreadyExists
-
-    @branchAlreadyExists.setter
-    def branchAlreadyExists(self, value):
-        self._branchAlreadyExists = value
-
-    @property
-    def cleanLogs(self):
-        return self._cleanLogs
-
-    @cleanLogs.setter
-    def cleanLogs(self, value):
-        self._cleanLogs = value
+    def __init__(self, cicd):
+        super().__init__(cicd)
+        self._createLogDir("gitlab")
 
     @property
     def sleepTime(self):
@@ -110,14 +54,6 @@ class GitLabRunner(BaseRunner):
         else:
             logger.critical("Invalid local project path.")
 
-    def __init__(self, cicd):
-        super().__init__(cicd)
-        self.__createLogDir()
-
-    def __createLogDir(self):
-        self._cicd.outputDir = realpath(self._cicd.outputDir) + "/gitlab"
-        makedirs(self._cicd.outputDir, exist_ok=True)
-
     def getProjects(self, project, strict=False, membership=False):
         if project:
             if exists(project):
@@ -125,20 +61,20 @@ class GitLabRunner(BaseRunner):
                 with open(project, "r") as file:
                     for p in file:
                         self._cicd.addProjects(
-                            project=p.strip(), filterWrite=self._writeAccessFilter, strict=strict, membership=membership
+                            project=p.strip(), filterWrite=self.writeAccessFilter, strict=strict, membership=membership
                         )
 
             else:
                 logger.info(f"Getting GitLab project: {project}")
                 self._cicd.addProjects(
-                    project=project, filterWrite=self._writeAccessFilter, strict=strict, membership=membership
+                    project=project, filterWrite=self.writeAccessFilter, strict=strict, membership=membership
                 )
         else:
             logger.info(f"Listing GitLab projects")
-            self._cicd.addProjects(filterWrite=self._writeAccessFilter, membership=membership)
+            self._cicd.addProjects(filterWrite=self.writeAccessFilter, membership=membership)
 
         if len(self._cicd.projects) == 0:
-            if self._writeAccessFilter:
+            if self.writeAccessFilter:
                 logger.critical("No repository with write access found.")
             else:
                 logger.critical("No repository found.")
@@ -165,7 +101,7 @@ class GitLabRunner(BaseRunner):
         logger.info("Listing GitLab runners")
 
         res = False
-        if self._extractProject:
+        if self.extractProject:
             res |= self.__listGitLabProjectRunners()
 
         if not res:
@@ -187,13 +123,13 @@ class GitLabRunner(BaseRunner):
         logger.info("Listing GitLab secrets")
 
         res = False
-        if self._extractInstance:
+        if self.extractInstance:
             res |= self.__listGitLabInstanceSecrets()
 
-        if self._extractGroup:
+        if self.extractGroup:
             res |= self.__listGitLabGroupSecrets()
 
-        if self._extractProject:
+        if self.extractProject:
             res |= self.__listGitLabProjectSecrets()
             res |= self.__listGitLabProjectSecureFiles()
 
@@ -466,7 +402,7 @@ class GitLabRunner(BaseRunner):
         if self._pushedCommitsCount > 0:
 
             projectId = project.get("id")
-            if self._cleanLogs:
+            if self.cleanLogs:
                 logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
                 self._cicd.cleanAllLogs(projectId)
 

@@ -38,6 +38,27 @@ def test_github_runner_config(tmp_path):
     assert runner.yaml.endswith("pipeline.yml")
 
 
+def test_gitlab_runner_config(tmp_path):
+    from nordstream.core.gitlab.gitlab import GitLabRunner
+
+    runner = GitLabRunner(_FakeCICD(str(tmp_path)))
+
+    assert runner.extractProject is True
+    assert runner.extractInstance is True
+    runner.extractGroup = False
+    assert runner.extractGroup is False
+
+    # shared BaseRunner config
+    assert runner.cleanLogs is True
+    assert runner.writeAccessFilter is False
+
+    # sleepTime still casts to int; localPath still validates existence
+    runner.sleepTime = "5"
+    assert runner.sleepTime == 5
+    runner.localPath = str(tmp_path)
+    assert runner.localPath == str(tmp_path)
+
+
 def test_createlogdir_appends_platform_subdir(tmp_path):
     from nordstream.core.github.github import GitHubWorkflowRunner
 
