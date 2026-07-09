@@ -10,6 +10,17 @@ import time
 from nordstream.utils.errors import GitLabError
 from nordstream.yaml.gitlab import GitLabPipelineGenerator
 from nordstream.parsers.gitlab import merge_runners
+from nordstream.report.gitlab import (
+    displayRunner,
+    displayVariable,
+    displaySecureFile,
+    displayProject,
+    displayUser,
+    displayGroup,
+    displayTokenInfo,
+    displayBranchesProtectionRulesPriv,
+    displayBranchesProtectionRulesUnpriv,
+)
 
 
 class GitLabRunner:
@@ -169,18 +180,7 @@ class GitLabRunner:
 
         for runner in runners:
             res = True
-            logger.info(
-                f'{runner["id"]} (scope: {runner["runner_type"].replace("_type", "")}, executor: {runner["executor"]}, accesslevel: {runner["access_level"]})'
-            )
-            logger.raw(f'    - status: {runner["status"].lower()} (lastseen: {runner["contacted_at"]})\n', logging.INFO)
-            logger.raw(f'    - description: {runner["description"] or "n/a"}\n', logging.INFO)
-            logger.raw(f'    - tags: {runner["tags"]}\n', logging.INFO)
-            logger.raw(f'    - platform: {runner["platform"]} ({runner["architecture"]})\n', logging.INFO)
-            logger.raw(f'    - ipaddress: {runner["ip_address"]}\n', logging.INFO)
-            if runner["projects"]:
-                logger.raw(f"    - projects:\n", logging.INFO)
-                for project in runner["projects"]:
-                    logger.raw(f"      - {project}\n", logging.INFO)
+            displayRunner(runner)
 
         return res
 
@@ -251,10 +251,7 @@ class GitLabRunner:
                 logger.info(f'"{projectName}" project variables')
 
                 for variable in variables:
-                    logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
-                        logging.INFO,
-                    )
+                    displayVariable(variable)
 
             variables_inherited = self._cicd.listInheritedVariablesFromProject(project)
             if len(variables_inherited) != 0:
@@ -262,10 +259,7 @@ class GitLabRunner:
                 logger.info(f'"{projectName}" inherited group variables')
 
                 for variable in variables_inherited:
-                    logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
-                        logging.INFO,
-                    )
+                    displayVariable(variable)
 
             if (len(variables) > 0) or (len(variables_inherited) > 0):
                 return True
@@ -286,7 +280,7 @@ class GitLabRunner:
                 logger.info(f'"{projectName}" secure files')
 
                 for file in secFiles:
-                    logger.raw(f'\t- {file["name"]} ({file["path"]})\n', logging.INFO)
+                    displaySecureFile(file)
                 return True
         except GitLabError as e:
             if logger.getEffectiveLevel() < logging.INFO:
@@ -304,10 +298,7 @@ class GitLabRunner:
                 logger.info(f'"{groupPath}" group variables:')
 
                 for variable in variables:
-                    logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
-                        logging.INFO,
-                    )
+                    displayVariable(variable)
                 return True
         except GitLabError as e:
             if logger.getEffectiveLevel() < logging.INFO:
@@ -321,10 +312,7 @@ class GitLabRunner:
             if len(variables) != 0:
                 logger.info("Instance variables:")
                 for variable in variables:
-                    logger.raw(
-                        f'\t- {variable["key"]}={variable["value"]} (protected:{variable["protected"]} / hidden:{variable["hidden"]})\n',
-                        logging.INFO,
-                    )
+                    displayVariable(variable)
                 return True
         except GitLabError as e:
             if logger.getEffectiveLevel() < logging.INFO:
@@ -335,37 +323,17 @@ class GitLabRunner:
     def listGitLabProjects(self):
         logger.info("Listing GitLab projects")
         for project in self._cicd.projects:
-
-            repoPath = project.get("path")
-            repoName = project.get("name")
-            repoId = project.get("id")
-
-            if repoPath != repoName:
-                logger.raw(f'- {project["path_with_namespace"]} / {repoId} ({repoName})\n', level=logging.INFO)
-            else:
-                logger.raw(f'- {project["path_with_namespace"]} / {repoId}\n', level=logging.INFO)
+            displayProject(project)
 
     def listGitLabUsers(self):
         logger.info("Listing GitLab users")
         for user in self._cicd.listUsers():
-            id = user.get("id")
-            username = user.get("username")
-            email = user.get("email")
-            is_admin = user.get("is_admin")
-
-            res = f"- {id} {username}"
-            if email != None:
-                res += f" {email}"
-
-            if is_admin != None:
-                res += f"(is_admin: {is_admin})"
-
-            logger.raw(f"{res}\n", level=logging.INFO)
+            displayUser(user)
 
     def listGitLabGroups(self):
         logger.info("Listing GitLab groups")
-        for project in self._cicd.groups:
-            logger.raw(f'- {project["full_path"]}\n', level=logging.INFO)
+        for group in self._cicd.groups:
+            displayGroup(group)
 
     def runPipeline(self):
         for project in self._cicd.projects:
@@ -532,28 +500,7 @@ class GitLabRunner:
     def describeToken(self):
         response = self._cicd.getUser()
         logger.info("Token information:")
-
-        username = response.get("username")
-        if username != "":
-            logger.raw(f"\t- Username: {username}\n", logging.INFO)
-
-        isAdmin = response.get("is_admin")
-        if isAdmin == None:
-            logger.raw(f"\t- IsAdmin: False\n", logging.INFO)
-        else:
-            logger.raw(f"\t- IsAdmin: {isAdmin}\n", logging.INFO)
-
-        email = response.get("email")
-        if email != "":
-            logger.raw(f"\t- Email: {email}\n", logging.INFO)
-
-        id = response.get("id")
-        if id != "":
-            logger.raw(f"\t- Id: {id}\n", logging.INFO)
-
-        note = response.get("note")
-        if note != "" and note != None:
-            logger.raw(f"\t- Note: {note}\n", logging.INFO)
+        displayTokenInfo(response)
 
     def listBranchesProtectionRules(self):
         logger.info("Listing branch protection rules.")
@@ -564,82 +511,18 @@ class GitLabRunner:
 
             try:
                 protections = self._cicd.getBranchesProtectionRules(project.get("id"))
-                self.__displayBranchesProtectionRulesPriv(protections)
+                displayBranchesProtectionRulesPriv(protections)
             except GitLabError as e:
                 logger.verbose(
                     "Not enough privileges to get full details on the branch protection rules for this project, trying to get limited information."
                 )
                 try:
                     branches = self._cicd.getBranches(project.get("id"))
-                    self.__displayBranchesProtectionRulesUnpriv(branches)
+                    displayBranchesProtectionRulesUnpriv(branches)
                 except GitLabError as e:
                     logger.error(f"\t{e}")
 
             logger.empty_line()
-
-    def __displayBranchesProtectionRulesPriv(self, protections):
-        if len(protections) == 0:
-            logger.success(f"No protection")
-
-        for protection in protections:
-
-            name = protection.get("name")
-            logger.info(f'branch: "{name}"')
-
-            allow_force_push = protection.get("allow_force_push")
-            logger.raw(f"\t- Allow force push: {allow_force_push}\n", logging.INFO)
-
-            code_owner_approval_required = protection.get("code_owner_approval_required", None)
-            if code_owner_approval_required != None:
-                logger.raw(f"\t- Code Owner approval required: {code_owner_approval_required}\n", logging.INFO)
-
-            push_access_levels = protection.get("push_access_levels", [])
-            logger.raw(f"\t- Push access level:\n", logging.INFO)
-            self.__displayAccessLevel(push_access_levels)
-
-            unprotect_access_levels = protection.get("unprotect_access_levels", [])
-            logger.raw(f"\t- Unprotect access level:\n", logging.INFO)
-            self.__displayAccessLevel(unprotect_access_levels)
-
-            merge_access_levels = protection.get("merge_access_levels", [])
-            logger.raw(f"\t- Merge access level:\n", logging.INFO)
-            self.__displayAccessLevel(merge_access_levels)
-
-    def __displayBranchesProtectionRulesUnpriv(self, branches):
-
-        for branch in branches:
-
-            isProtected = branch.get("protected")
-            if isProtected:
-
-                name = branch.get("name")
-                logger.info(f'branch: "{name}"')
-
-                logger.raw(f"\t- Protected: True\n", logging.INFO)
-
-                developers_can_push = branch.get("developers_can_push")
-                logger.raw(f"\t- Developers can push: {developers_can_push}\n", logging.INFO)
-
-                developers_can_merge = branch.get("developers_can_merge")
-                logger.raw(f"\t- Developers can merge: {developers_can_merge}\n", logging.INFO)
-
-    def __displayAccessLevel(self, access_levels):
-        for al in access_levels:
-            access_level = al.get("access_level", None)
-            user_id = al.get("user_id", None)
-            group_id = al.get("group_id", None)
-            access_level_description = al.get("access_level_description")
-
-            res = f"\t\t{access_level_description}"
-
-            if access_level != None:
-                res += f" (access_level={access_level})"
-            if user_id != None:
-                res += f" (user_id={user_id})"
-            if group_id != None:
-                res += f" (group_id={group_id})"
-
-            logger.raw(f"{res}\n", logging.INFO)
 
     def __displayFailureReasons(self, projectId, pipelineId):
         logger.error("Pipeline has failed.")
