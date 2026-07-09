@@ -3,13 +3,13 @@ import logging
 from urllib.parse import urlparse
 from os import makedirs, chdir
 from os.path import exists, realpath
-from datetime import datetime
 from nordstream.utils.log import logger
 from nordstream.git import Git
 import subprocess
 import time
 from nordstream.utils.errors import GitLabError
 from nordstream.yaml.gitlab import GitLabPipelineGenerator
+from nordstream.parsers.gitlab import merge_runners
 
 
 class GitLabRunner:
@@ -161,28 +161,11 @@ class GitLabRunner:
         if not res:
             logger.warning("You don't have access to any runner or job")
 
-    def __mergeLists(self, current, new, key):
-        current[key] = list(set(current[key] + new[key]))
-        new[key] = current[key]
-
-    def __mergeRunners(self, current, new):
-        for runner in new:
-            existing = next((c for c in current if c["id"] == runner["id"]), None)
-            if not existing:
-                current.append(runner)
-                continue
-
-            date = lambda d: datetime.strptime(d, "%Y-%m-%dT%H:%M:%S.%fZ")
-            self.__mergeLists(existing, runner, "projects")
-            self.__mergeLists(existing, runner, "tags")
-            if date(runner["contacted_at"]) > date(existing["contacted_at"]):
-                existing.update(runner)
-
     def __listGitLabProjectRunners(self):
         res = False
         runners = []
         for project in self._cicd.projects:
-            self.__mergeRunners(runners, self._cicd.listRunnersFromProject(project))
+            merge_runners(runners, self._cicd.listRunnersFromProject(project))
 
         for runner in runners:
             res = True
