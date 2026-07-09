@@ -172,7 +172,6 @@ class GitLab(BaseClient):
         )
 
     def listInheritedVariablesFromProject(self, project):
-        id = project.get("id")
         res = []
 
         graphQL = {

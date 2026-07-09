@@ -1,8 +1,8 @@
 import logging
 import subprocess
 import time
-from os import chdir, makedirs
-from os.path import exists, realpath
+from os import chdir
+from os.path import exists
 
 from nordstream.git import Git
 from nordstream.utils.errors import DevOpsError, GitError, RepoCreationError

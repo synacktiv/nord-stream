@@ -1,8 +1,8 @@
 import logging
 
 from urllib.parse import urlparse
-from os import makedirs, chdir
-from os.path import exists, realpath
+from os import chdir
+from os.path import exists
 from nordstream.utils.log import logger
 from nordstream.git import Git
 import subprocess
@@ -421,7 +421,7 @@ class GitLabRunner(BaseRunner):
             try:
                 protections = self._cicd.getBranchesProtectionRules(project.get("id"))
                 displayBranchesProtectionRulesPriv(protections)
-            except GitLabError as e:
+            except GitLabError:
                 logger.verbose(
                     "Not enough privileges to get full details on the branch protection rules for this project, trying to get limited information."
                 )

@@ -2,7 +2,7 @@ import logging
 import glob
 from zipfile import ZipFile
 from os import makedirs, chdir
-from os.path import exists, realpath, basename
+from os.path import exists, basename
 from nordstream.yaml.github import WorkflowGenerator
 from nordstream.yaml.custom import CustomGenerator
 from nordstream.core.github.protections import (
@@ -10,7 +10,15 @@ from nordstream.core.github.protections import (
     resetRequiredPullRequestReviews,
     resetRestrictions,
 )
-from nordstream.report.github import *
+from nordstream.report.github import (
+    displayRepoSecrets,
+    displayDependabotRepoSecrets,
+    displayEnvSecrets,
+    displayOrgSecrets,
+    displayDependabotOrgSecrets,
+    displayEnvSecurity,
+    displayBranchProtectionRules,
+)
 from nordstream.parsers.github import decode_workflow_secret_line
 from nordstream.core.base import BaseRunner
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
@@ -211,7 +219,7 @@ class GitHubWorkflowRunner(BaseRunner):
             # check workflow status and get result if it's ok
             return self.__postProcessingWorkflow(repo, workflowId, workflowConclusion, outputName)
 
-        except GitPushError as e:
+        except GitPushError:
             pass
 
         except Exception as e:
@@ -616,8 +624,6 @@ class GitHubWorkflowRunner(BaseRunner):
         else:
             logger.verbose("No environment protection rule found")
             return False
-
-        return policyId, waitTime, reviewers, branchPolicy
 
     def __disableEnvProtections(self, repo, envDetails):
         protectionRules = envDetails.get("protection_rules")
