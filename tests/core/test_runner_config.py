@@ -59,6 +59,33 @@ def test_gitlab_runner_config(tmp_path):
     assert runner.localPath == str(tmp_path)
 
 
+def test_devops_runner_config(tmp_path):
+    from nordstream.core.devops.devops import DevOpsRunner
+
+    class _FakeDevOpsCICD(_FakeCICD):
+        org = "myorg"
+
+    runner = DevOpsRunner(_FakeDevOpsCICD(str(tmp_path)))
+
+    # plain public config
+    assert runner.os == "linux"
+    assert runner.pipelineFilename == "azure-pipelines.yml"
+    runner.poolName = "pool1"
+    runner.output = "out.yml"
+    assert runner.poolName == "pool1"
+    assert runner.output == "out.yml"
+
+    # shared BaseRunner config
+    assert runner.cleanLogs is True
+    assert runner.writeAccessFilter is False
+
+    # extraction toggles are still driven by parseExtractList
+    runner.parseExtractList("vg,sf", allow=True)
+    assert runner._extractVariableGroups is True
+    assert runner._extractSecureFiles is True
+    assert runner._extractAzureServiceconnections is False
+
+
 def test_createlogdir_appends_platform_subdir(tmp_path):
     from nordstream.core.github.github import GitHubWorkflowRunner
 

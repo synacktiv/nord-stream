@@ -23,6 +23,7 @@ from nordstream.report.devops import (
 
 
 class DevOpsRunner(BaseRunner):
+    # Service-connection / secret extraction toggles, set via parseExtractList().
     _extractVariableGroups = True
     _extractSecureFiles = True
     _extractAzureServiceconnections = True
@@ -30,135 +31,18 @@ class DevOpsRunner(BaseRunner):
     _extractAWSServiceconnections = True
     _extractSonarServiceconnections = True
     _extractSSHServiceConnections = True
-    _yaml = None
-    _writeAccessFilter = False
-    _poolName = None
-    _os = "linux"
-    _pipelineFilename = "azure-pipelines.yml"
-    _output = None
-    _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
     _allowedTypes = ["azurerm", "github", "aws", "sonarqube", "ssh"]
 
+    # Plain public config (set by the CLI).
+    output = None
+    poolName = None
+    os = "linux"
+    pipelineFilename = "azure-pipelines.yml"
+
     def __init__(self, cicd):
         super().__init__(cicd)
-        self.__createLogDir()
-
-    @property
-    def extractVariableGroups(self):
-        return self._extractVariableGroups
-
-    @extractVariableGroups.setter
-    def extractVariableGroups(self, value):
-        self._extractVariableGroups = value
-
-    @property
-    def extractSecureFiles(self):
-        return self._extractSecureFiles
-
-    @extractSecureFiles.setter
-    def extractSecureFiles(self, value):
-        self._extractSecureFiles = value
-
-    @property
-    def extractAzureServiceconnections(self):
-        return self._extractAzureServiceconnections
-
-    @extractAzureServiceconnections.setter
-    def extractAzureServiceconnections(self, value):
-        self._extractAzureServiceconnections = value
-
-    @property
-    def extractGitHubServiceconnections(self):
-        return self._extractGitHubServiceconnections
-
-    @extractGitHubServiceconnections.setter
-    def extractGitHubServiceconnections(self, value):
-        self._extractGitHubServiceconnections = value
-
-    @property
-    def extractAWSServiceconnections(self):
-        return self._extractAWSServiceconnections
-
-    @extractAWSServiceconnections.setter
-    def extractAWSServiceconnections(self, value):
-        self._extractAWSServiceconnections = value
-
-    @property
-    def extractSonarerviceconnections(self):
-        return self._extractSonarServiceconnections
-
-    @extractSonarerviceconnections.setter
-    def extractSonarerviceconnections(self, value):
-        self._extractSonarServiceconnections = value
-
-    @property
-    def extractSSHServiceConnections(self):
-        return self._extractSSHServiceConnections
-
-    @extractSSHServiceConnections.setter
-    def extractSSHServiceConnections(self, value):
-        self._extractSSHServiceConnections = value
-
-    @property
-    def output(self):
-        return self._output
-
-    @output.setter
-    def output(self, value):
-        self._output = value
-
-    @property
-    def cleanLogs(self):
-        return self._cleanLogs
-
-    @cleanLogs.setter
-    def cleanLogs(self, value):
-        self._cleanLogs = value
-
-    @property
-    def yaml(self):
-        return self._yaml
-
-    @yaml.setter
-    def yaml(self, value):
-        self._yaml = realpath(value)
-
-    @property
-    def pipelineFilename(self):
-        return self._pipelineFilename
-
-    @pipelineFilename.setter
-    def pipelineFilename(self, value):
-        self._pipelineFilename = value
-
-    @property
-    def writeAccessFilter(self):
-        return self._writeAccessFilter
-
-    @writeAccessFilter.setter
-    def writeAccessFilter(self, value):
-        self._writeAccessFilter = value
-
-    @property
-    def poolName(self):
-        return self._poolName
-
-    @poolName.setter
-    def poolName(self, value):
-        self._poolName = value
-
-    @property
-    def os(self):
-        return self._os
-
-    @os.setter
-    def os(self, value):
-        self._os = value
-
-    def __createLogDir(self):
-        self._cicd.outputDir = realpath(self._cicd.outputDir) + "/azure_devops"
-        makedirs(self._cicd.outputDir, exist_ok=True)
+        self._createLogDir("azure_devops")
 
     def listDevOpsProjects(self):
         logger.info("Listing all projects:")
@@ -189,11 +73,11 @@ class DevOpsRunner(BaseRunner):
         else:
             self._cicd.listProjects()
 
-        if self._writeAccessFilter:
+        if self.writeAccessFilter:
             self._cicd.filterWriteProjects()
 
         if len(self._cicd.projects) == 0:
-            if self._writeAccessFilter:
+            if self.writeAccessFilter:
                 logger.critical("No project with write access found.")
             else:
                 logger.critical("No project found.")
@@ -284,23 +168,21 @@ class DevOpsRunner(BaseRunner):
     def createYaml(self, pipelineType):
         pipelineGenerator = DevOpsPipelineGenerator()
         if pipelineType == "github":
-            pipelineGenerator.generatePipelineForGitHub("#FIXME", self._poolName, self._os)
+            pipelineGenerator.generatePipelineForGitHub("#FIXME", self.poolName, self.os)
         elif pipelineType == "azurerm":
-            pipelineGenerator.generatePipelineForAzureRm("#FIXME", self._poolName, self._os)
+            pipelineGenerator.generatePipelineForAzureRm("#FIXME", self.poolName, self.os)
         elif pipelineType == "aws":
-            pipelineGenerator.generatePipelineForAWS("#FIXME", self._poolName, self._os)
+            pipelineGenerator.generatePipelineForAWS("#FIXME", self.poolName, self.os)
         elif pipelineType == "sonar":
-            pipelineGenerator.generatePipelineForSonar("#FIXME", self._poolName, self._os)
+            pipelineGenerator.generatePipelineForSonar("#FIXME", self.poolName, self.os)
         elif pipelineType == "ssh":
-            pipelineGenerator.generatePipelineForSSH("#FIXME", self._poolName, self._os)
+            pipelineGenerator.generatePipelineForSSH("#FIXME", self.poolName, self.os)
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction(
-                {"name": "", "variables": ""}, self._poolName, self._os
-            )
+            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self.poolName, self.os)
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
-        pipelineGenerator.writeFile(self._output)
+        pipelineGenerator.writeFile(self.output)
 
     def __extractPipelineOutput(self, projectId, resType=0, resultsFilename="secrets.txt"):
         with open(
@@ -332,7 +214,7 @@ class DevOpsRunner(BaseRunner):
     def __launchPipeline(self, project, pipelineId, pipelineGenerator):
         logger.verbose(f"Launching pipeline.")
 
-        pipelineGenerator.writeFile(f"./{self._pipelineFilename}")
+        pipelineGenerator.writeFile(f"./{self.pipelineFilename}")
         pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
 
@@ -387,7 +269,7 @@ class DevOpsRunner(BaseRunner):
             if len(variableGroups) > 0:
                 for variableGroup in variableGroups:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup, self._poolName, self._os)
+                    pipelineGenerator.generatePipelineForSecretExtraction(variableGroup, self.poolName, self.os)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for variable group: "{variableGroup["name"]}"'
@@ -423,7 +305,7 @@ class DevOpsRunner(BaseRunner):
             if secureFiles:
                 for secureFile in secureFiles:
                     pipelineGenerator = DevOpsPipelineGenerator()
-                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"], self._poolName)
+                    pipelineGenerator.generatePipelineForSecureFileExtraction(secureFile["name"], self.poolName)
 
                     logger.verbose(
                         f'Checking (and modifying) pipeline permissions for the secure file: "{secureFile["name"]}"'
@@ -456,7 +338,7 @@ class DevOpsRunner(BaseRunner):
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForGitHub(endpoint, self._poolName, self._os)
+        pipelineGenerator.generatePipelineForGitHub(endpoint, self.poolName, self.os)
 
         logger.info(f'Extracting secrets for GitHub: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -473,7 +355,7 @@ class DevOpsRunner(BaseRunner):
         if scheme == "serviceprincipal":
             name = sc.get("name")
             pipelineGenerator = DevOpsPipelineGenerator()
-            pipelineGenerator.generatePipelineForAzureRm(name, self._poolName, self._os)
+            pipelineGenerator.generatePipelineForAzureRm(name, self.poolName, self.os)
 
             logger.info(f'Extracting secrets for AzureRM: "{name}"')
             runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -494,7 +376,7 @@ class DevOpsRunner(BaseRunner):
             name = sc.get("name")
 
             pipelineGenerator = DevOpsPipelineGenerator()
-            pipelineGenerator.generatePipelineForAWS(name, self._poolName, self._os)
+            pipelineGenerator.generatePipelineForAWS(name, self.poolName, self.os)
 
             logger.info(f'Extracting secrets for AWS: "{name}"')
             runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -511,7 +393,7 @@ class DevOpsRunner(BaseRunner):
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForSonar(endpoint, self._poolName, self._os)
+        pipelineGenerator.generatePipelineForSonar(endpoint, self.poolName, self.os)
 
         logger.info(f'Extracting secrets for Sonar: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -526,7 +408,7 @@ class DevOpsRunner(BaseRunner):
         endpoint = sc.get("name")
 
         pipelineGenerator = DevOpsPipelineGenerator()
-        pipelineGenerator.generatePipelineForSSH(endpoint, self._poolName, self._os)
+        pipelineGenerator.generatePipelineForSSH(endpoint, self.poolName, self.os)
 
         logger.info(f'Extracting secrets for ssh: "{endpoint}"')
         runId = self.__launchPipeline(projectId, pipelineId, pipelineGenerator)
@@ -633,7 +515,7 @@ class DevOpsRunner(BaseRunner):
         raise RepoCreationError("No repo found")
 
     def __clean(self, projectId, repoId, deleteRemoteRepo, deleteRemotePipeline):
-        if self._cleanLogs:
+        if self.cleanLogs:
             if deleteRemotePipeline:
                 logger.verbose("Deleting remote pipeline.")
                 self._cicd.deletePipeline(projectId)
@@ -645,7 +527,7 @@ class DevOpsRunner(BaseRunner):
         else:
             if self._pushedCommitsCount > 0:
 
-                if self._cleanLogs:
+                if self.cleanLogs:
                     logger.info(f"Cleaning logs for project: {projectId}")
                     self._cicd.cleanAllLogs(projectId)
 
@@ -666,7 +548,7 @@ class DevOpsRunner(BaseRunner):
             if pipeline.get("name") == self._cicd.pipelineName:
                 return pipeline.get("id"), False
 
-        pipelineId = self._cicd.createPipeline(projectId, repoId, f"{self._pipelineFilename}")
+        pipelineId = self._cicd.createPipeline(projectId, repoId, f"{self.pipelineFilename}")
         if pipelineId:
             return pipelineId, True
         else:
