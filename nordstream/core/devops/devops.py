@@ -1,4 +1,3 @@
-import base64
 import logging
 import subprocess
 import time
@@ -10,6 +9,7 @@ from nordstream.utils.errors import DevOpsError, GitError, RepoCreationError
 from nordstream.utils.helpers import isAllowed
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
+from nordstream.parsers.devops import decode_double_b64, extract_github_authorization
 
 
 class DevOpsRunner:
@@ -302,7 +302,9 @@ class DevOpsRunner:
         elif pipelineType == "ssh":
             pipelineGenerator.generatePipelineForSSH("#FIXME", self._poolName, self._os)
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self._poolName, self._os)
+            pipelineGenerator.generatePipelineForSecretExtraction(
+                {"name": "", "variables": ""}, self._poolName, self._os
+            )
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
@@ -313,49 +315,27 @@ class DevOpsRunner:
             f"{self._cicd.outputDir}/{self._cicd.org}/{projectId}/{self._fileName}",
             "rb",
         ) as output:
-            try:
-                if resType == self._resType["doubleb64"]:
-                    pipelineResults = self.__doubleb64(output)
-                elif resType == self._resType["github"]:
-                    pipelineResults = self.__extractGitHubResults(output)
-                elif resType == self._resType["azurerm"]:
-                    pipelineResults = self.__azureRm(output)
-                elif resType == self._resType["default"]:
-                    pipelineResults = output.read()
-                else:
-                    logger.exception("Invalid type checkout: _resType")
-            except:
-                output.seek(0)
-                pipelineResults = output.read()
+            content = output.read()
+
+        try:
+            if resType == self._resType["doubleb64"]:
+                pipelineResults = decode_double_b64(content)
+            elif resType == self._resType["github"]:
+                pipelineResults = extract_github_authorization(content)
+            elif resType == self._resType["azurerm"]:
+                pipelineResults = decode_double_b64(content)
+            elif resType == self._resType["default"]:
+                pipelineResults = content
+            else:
+                logger.exception("Invalid type checkout: _resType")
+        except Exception:
+            pipelineResults = content
 
         logger.success("Output:")
         logger.raw(pipelineResults, logging.INFO)
 
         with open(f"{self._cicd.outputDir}/{self._cicd.org}/{projectId}/{resultsFilename}", "ab") as file:
             file.write(pipelineResults)
-
-    @staticmethod
-    def __extractGitHubResults(output):
-        decoded = DevOpsRunner.__doubleb64(output)
-        for line in decoded.split(b"\n"):
-            if b"AUTHORIZATION" in line:
-                try:
-                    return base64.b64decode(line.split(b" ")[-1]) + b"\n"
-                except Exception as e:
-                    logger.error(e)
-        return None
-
-    @staticmethod
-    def __doubleb64(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
-
-    @staticmethod
-    def __azureRm(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
 
     def __launchPipeline(self, project, pipelineId, pipelineGenerator):
         logger.verbose(f"Launching pipeline.")
