@@ -1,6 +1,6 @@
 import subprocess
 from nordstream.utils.log import logger
-from nordstream.utils.constants import *
+from nordstream.utils.constants import GIT_USER, GIT_EMAIL, GIT_ATTACK_COMMIT_MSG, GIT_CLEAN_COMMIT_MSG
 from nordstream.utils.helpers import randomString
 
 """

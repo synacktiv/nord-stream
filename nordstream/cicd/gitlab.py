@@ -7,7 +7,7 @@ from nordstream.cicd.base import BaseClient
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
-from nordstream.utils.constants import *
+from nordstream.utils.constants import USER_AGENT, COMPLETED_STATES
 from nordstream.utils.helpers import isGitLabSessionCookie
 
 # painful warnings you know what you are doing right ?

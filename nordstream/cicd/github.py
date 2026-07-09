@@ -6,7 +6,7 @@ from nordstream.cicd.base import BaseClient
 from nordstream.utils.errors import GitHubError, GitHubBadCredentials
 from nordstream.utils.log import logger
 from nordstream.git import Git
-from nordstream.utils.constants import *
+from nordstream.utils.constants import USER_AGENT
 
 
 class GitHub(BaseClient):

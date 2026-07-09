@@ -6,7 +6,7 @@ from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.git import Git
 from nordstream.utils.errors import DevOpsError
-from nordstream.utils.constants import *
+from nordstream.utils.constants import USER_AGENT, DEFAULT_PIPELINE_NAME, DEFAULT_REPO_NAME
 from nordstream.utils.helpers import isAZDOBearerToken
 
 # painfull warnings you know what you are doing right ?
