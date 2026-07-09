@@ -10,7 +10,7 @@ from nordstream.core.github.protections import (
     resetRequiredPullRequestReviews,
     resetRestrictions,
 )
-from nordstream.core.github.display import *
+from nordstream.report.github import *
 from nordstream.parsers.github import decode_workflow_secret_line
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
