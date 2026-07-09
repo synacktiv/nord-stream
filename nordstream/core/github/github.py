@@ -23,168 +23,23 @@ import subprocess
 
 class GitHubWorkflowRunner(BaseRunner):
     _taskName = "command"
-    _workflowFilename = DEFAULT_WORKFLOW_FILENAME
-    _fileName = None
-    _env = None
-    _extractRepo = True
-    _extractEnv = True
-    _extractOrg = True
-    _yaml = None
-    _exploitOIDC = False
-    _tenantId = None
-    _subscriptionId = None
-    _clientId = None
-    _role = None
-    _region = None
-    _forceDeploy = False
-    _disableProtections = None
-    _writeAccessFilter = False
-    _cleanLogs = True
+    workflowFilename = DEFAULT_WORKFLOW_FILENAME
+    extractRepo = True
+    extractEnv = True
+    extractOrg = True
+    exploitOIDC = False
+    tenantId = None
+    subscriptionId = None
+    clientId = None
+    role = None
+    region = None
+    forceDeploy = False
+    disableProtections = None
 
     def __init__(self, cicd, env):
         super().__init__(cicd)
         self._env = env
-        self.__createLogDir()
-
-    @property
-    def extractRepo(self):
-        return self._extractRepo
-
-    @extractRepo.setter
-    def extractRepo(self, value):
-        self._extractRepo = value
-
-    @property
-    def extractEnv(self):
-        return self._extractEnv
-
-    @extractEnv.setter
-    def extractEnv(self, value):
-        self._extractEnv = value
-
-    @property
-    def extractOrg(self):
-        return self._extractOrg
-
-    @extractOrg.setter
-    def extractOrg(self, value):
-        self._extractOrg = value
-
-    @property
-    def workflowFilename(self):
-        return self._workflowFilename
-
-    @workflowFilename.setter
-    def workflowFilename(self, value):
-        self._workflowFilename = value
-
-    @property
-    def yaml(self):
-        return self._yaml
-
-    @yaml.setter
-    def yaml(self, value):
-        self._yaml = realpath(value)
-
-    @property
-    def exploitOIDC(self):
-        return self._exploitOIDC
-
-    @exploitOIDC.setter
-    def exploitOIDC(self, value):
-        self._exploitOIDC = value
-
-    @property
-    def tenantId(self):
-        return self._tenantId
-
-    @tenantId.setter
-    def tenantId(self, value):
-        self._tenantId = value
-
-    @property
-    def subscriptionId(self):
-        return self._subscriptionId
-
-    @subscriptionId.setter
-    def subscriptionId(self, value):
-        self._subscriptionId = value
-
-    @property
-    def clientId(self):
-        return self._clientId
-
-    @clientId.setter
-    def clientId(self, value):
-        self._clientId = value
-
-    @property
-    def role(self):
-        return self._role
-
-    @role.setter
-    def role(self, value):
-        self._role = value
-
-    @property
-    def region(self):
-        return self._region
-
-    @region.setter
-    def region(self, value):
-        self._region = value
-
-    @property
-    def disableProtections(self):
-        return self._disableProtections
-
-    @disableProtections.setter
-    def disableProtections(self, value):
-        self._disableProtections = value
-
-    @property
-    def writeAccessFilter(self):
-        return self._writeAccessFilter
-
-    @writeAccessFilter.setter
-    def writeAccessFilter(self, value):
-        self._writeAccessFilter = value
-
-    @property
-    def branchAlreadyExists(self):
-        return self._branchAlreadyExists
-
-    @branchAlreadyExists.setter
-    def branchAlreadyExists(self, value):
-        self._branchAlreadyExists = value
-
-    @property
-    def pushedCommitsCount(self):
-        return self._pushedCommitsCount
-
-    @pushedCommitsCount.setter
-    def pushedCommitsCount(self, value):
-        self._pushedCommitsCount = value
-
-    @property
-    def forceDeploy(self):
-        return self._forceDeploy
-
-    @forceDeploy.setter
-    def forceDeploy(self, value):
-        self._forceDeploy = value
-
-    @property
-    def cleanLogs(self):
-        return self._cleanLogs
-
-    @cleanLogs.setter
-    def cleanLogs(self, value):
-        self._cleanLogs = value
-
-    def __createLogDir(self):
-        self._cicd.outputDir = realpath(self._cicd.outputDir) + "/github"
-        makedirs(self._cicd.outputDir, exist_ok=True)
+        self._createLogDir("github")
 
     @staticmethod
     def __createWorkflowDir():
@@ -241,10 +96,10 @@ class GitHubWorkflowRunner(BaseRunner):
         workflowGenerator = WorkflowGenerator()
 
         if workflowType == "awsoidc":
-            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self._role, self._region, self._env)
+            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self.role, self.region, self._env)
         elif workflowType == "azureoidc":
             workflowGenerator.generateWorkflowForOIDCAzureTokenGeneration(
-                self._tenantId, self._subscriptionId, self._clientId, self._env
+                self.tenantId, self.subscriptionId, self.clientId, self._env
             )
         else:
             repo = self._cicd.org + "/" + repo
@@ -265,18 +120,18 @@ class GitHubWorkflowRunner(BaseRunner):
 
         logger.success("YAML file: ")
         workflowGenerator.displayYaml()
-        workflowGenerator.writeFile(self._workflowFilename)
+        workflowGenerator.writeFile(self.workflowFilename)
 
     def __extractSecretsFromRepo(self, repo):
         logger.info(f'Getting secrets from repo: "{repo}"')
         secrets = []
 
         try:
-            if self._extractRepo:
+            if self.extractRepo:
                 secrets += self._cicd.listSecretsFromRepo(repo)
                 # we can't extract dependabot secrets from regular workflows
                 # secrets += self._cicd.listDependabotSecretsFromRepo(repo)
-            if self._extractOrg:
+            if self.extractOrg:
                 secrets += self._cicd.listOrganizationSecretsFromRepo(repo)
                 # we can't extract dependabot secrets from regular workflows
                 # secrets += self._cicd.listDependabotOrganizationSecrets()
@@ -333,14 +188,14 @@ class GitHubWorkflowRunner(BaseRunner):
         try:
 
             # disable env protection before launching the workflow if no '--force' and env is not null
-            if not self._forceDeploy and env:
+            if not self.forceDeploy and env:
 
                 # check protection and if enabled return the protections
                 envDetails = self.__isEnvProtectionsEnabled(repo, env)
                 if envDetails and len(envDetails.get("protection_rules")):
 
                     # if --disable-protection disable the env protections
-                    if self._disableProtections:
+                    if self.disableProtections:
                         (
                             policyId,
                             waitTime,
@@ -367,13 +222,13 @@ class GitHubWorkflowRunner(BaseRunner):
         finally:
 
             # restore protections
-            if self._disableProtections and envDetails:
+            if self.disableProtections and envDetails:
                 self.__restoreEnvProtections(repo, env, policyId, waitTime, reviewers, branchPolicy)
 
     def __launchWorkflow(self, repo, workflowGenerator):
         logger.verbose(f"Launching workflow.")
 
-        workflowGenerator.writeFile(f".github/workflows/{self._workflowFilename}")
+        workflowGenerator.writeFile(f".github/workflows/{self.workflowFilename}")
 
         pushOutput = Git.gitPush(self._cicd.branchName)
         pushOutput.wait()
@@ -392,7 +247,7 @@ class GitHubWorkflowRunner(BaseRunner):
             self._pushedCommitsCount += 1
 
             logger.raw(pushOutput.communicate()[1])
-            workflowId, workflowConclusion = self._cicd.waitWorkflow(repo, self._workflowFilename)
+            workflowId, workflowConclusion = self._cicd.waitWorkflow(repo, self.workflowFilename)
 
             return workflowId, workflowConclusion
 
@@ -422,19 +277,19 @@ class GitHubWorkflowRunner(BaseRunner):
 
     def listGitHubSecrets(self):
         logger.info("Listing secrets:")
-        if self._extractOrg:
+        if self.extractOrg:
             self.__displayDependabotOrgSecrets()
 
         for repo in self._cicd.repos:
             logger.info(f'"{repo}" secrets')
 
-            if self._extractRepo:
+            if self.extractRepo:
                 self.__displayRepoSecrets(repo)
 
-            if self._extractEnv:
+            if self.extractEnv:
                 self.__displayEnvSecrets(repo)
 
-            if self._extractOrg:
+            if self.extractOrg:
                 self.__displayOrgSecrets(repo)
 
     def __displayRepoSecrets(self, repo):
@@ -498,11 +353,11 @@ class GitHubWorkflowRunner(BaseRunner):
         except GitHubBadCredentials:
             logger.fatal("Invalid token.")
 
-        if self._writeAccessFilter:
+        if self.writeAccessFilter:
             self._cicd.filterWriteRepos()
 
         if len(self._cicd.repos) == 0:
-            if self._writeAccessFilter:
+            if self.writeAccessFilter:
                 logger.critical("No repository with write access found.")
             else:
                 logger.critical("No repository found.")
@@ -510,7 +365,7 @@ class GitHubWorkflowRunner(BaseRunner):
     def manualCleanLogs(self):
         logger.info("Deleting logs")
         for repo in self._cicd.repos:
-            self._cicd.cleanAllLogs(repo, self._workflowFilename)
+            self._cicd.cleanAllLogs(repo, self.workflowFilename)
 
     def manualCleanBranchPolicy(self):
         logger.info("Deleting deployment branch policy")
@@ -523,7 +378,7 @@ class GitHubWorkflowRunner(BaseRunner):
         workflowGenerator = CustomGenerator()
         workflowGenerator.loadFile(self._yaml)
 
-        self._workflowFilename = basename(self._yaml)
+        self.workflowFilename = basename(self._yaml)
 
         if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "custom", self._env):
             self.__displayCustomWorkflowOutput(repo)
@@ -533,16 +388,16 @@ class GitHubWorkflowRunner(BaseRunner):
     def __runOIDCTokenGenerationWorfklow(self, repo):
 
         workflowGenerator = WorkflowGenerator()
-        if self._tenantId is not None and self._clientId is not None:
+        if self.tenantId is not None and self.clientId is not None:
             logger.info("Running OIDC Azure access tokens generation workflow")
             informationType = "OIDC access tokens"
             workflowGenerator.generateWorkflowForOIDCAzureTokenGeneration(
-                self._tenantId, self._subscriptionId, self._clientId, self._env
+                self.tenantId, self.subscriptionId, self.clientId, self._env
             )
         else:
             logger.info("Running OIDC AWS credentials generation workflow")
             informationType = "OIDC credentials"
-            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self._role, self._region, self._env)
+            workflowGenerator.generateWorkflowForOIDCAWSTokenGeneration(self.role, self.region, self._env)
 
         if self.__generateAndLaunchWorkflow(repo, workflowGenerator, "oidc", self._env):
             self.__extractSensitiveInformationFromWorkflowResult(repo, informationType=informationType)
@@ -550,10 +405,10 @@ class GitHubWorkflowRunner(BaseRunner):
         logger.empty_line()
 
     def __runSecretsExtractionWorkflow(self, repo):
-        if self._extractRepo or self._extractOrg:
+        if self.extractRepo or self.extractOrg:
             self.__extractSecretsFromRepo(repo)
 
-        if self._extractEnv:
+        if self.extractEnv:
             self.__extractSecretsFromEnv(repo)
 
     def __clean(self, repo, cleanRemoteLogs=True):
@@ -565,7 +420,7 @@ class GitHubWorkflowRunner(BaseRunner):
 
                 try:
 
-                    self._cicd.cleanAllLogs(repo, self._workflowFilename)
+                    self._cicd.cleanAllLogs(repo, self.workflowFilename)
 
                 except Exception as e:
                     logger.error(f"Error while cleaning logs: {e}")
@@ -599,7 +454,7 @@ class GitHubWorkflowRunner(BaseRunner):
 
                 # check and disable branch protection rules
                 protections = None
-                if not self._forceDeploy:
+                if not self.forceDeploy:
                     protections = self.__checkAndDisableBranchProtectionRules(repo)
 
                 self.__createWorkflowDir()
@@ -615,7 +470,7 @@ class GitHubWorkflowRunner(BaseRunner):
 
             finally:
 
-                self.__clean(repo, cleanRemoteLogs=self._cleanLogs)
+                self.__clean(repo, cleanRemoteLogs=self.cleanLogs)
 
                 # if we are working with the default nord-stream branch we managed to
                 # delete the branch during the previous clean operation
@@ -632,7 +487,7 @@ class GitHubWorkflowRunner(BaseRunner):
     def __dispatchWorkflow(self, repo):
         if self._yaml:
             self.__runCustomWorkflow(repo)
-        elif self._exploitOIDC:
+        elif self.exploitOIDC:
             self.__runOIDCTokenGenerationWorfklow(repo)
         else:
             self.__runSecretsExtractionWorkflow(repo)
