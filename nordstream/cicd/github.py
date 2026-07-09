@@ -2,38 +2,28 @@ import requests
 import time
 from os import makedirs
 import urllib.parse
+from nordstream.cicd.base import BaseClient
 from nordstream.utils.errors import GitHubError, GitHubBadCredentials
 from nordstream.utils.log import logger
 from nordstream.git import Git
 from nordstream.utils.constants import *
 
 
-class GitHub:
-    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
-    _token = None
-    _auth = None
-    _org = None
-    _githubLogin = None
-    _repos = []
+class GitHub(BaseClient):
     _header = {
         "Accept": "application/vnd.github+json",
         "User-Agent": USER_AGENT,
     }
     _repoURL = "https://api.github.com/repos"
-    _session = None
-    _branchName = _DEFAULT_BRANCH_NAME
-    _outputDir = OUTPUT_DIR
     _sleepTime = 15
     _maxRetry = 10
-    _isGHSToken = False
 
     def __init__(self, token):
-        self._token = token
-        self._auth = ("foo", self._token)
-        self._session = requests.Session()
-        if token.lower().startswith("ghs_"):
-            self._isGHSToken = True
-
+        super().__init__(token)
+        self._auth = ("foo", token)
+        self._org = None
+        self._repos = []
+        self._isGHSToken = token.lower().startswith("ghs_")
         self._githubLogin = self.__getLogin()
 
     @staticmethod
@@ -48,10 +38,6 @@ class GitHub:
         return requests.post("https://api.github.com/graphql", headers=headers, json=data).status_code == 200
 
     @property
-    def token(self):
-        return self._token
-
-    @property
     def org(self):
         return self._org
 
@@ -60,28 +46,8 @@ class GitHub:
         self._org = org
 
     @property
-    def defaultBranchName(self):
-        return self._DEFAULT_BRANCH_NAME
-
-    @property
-    def branchName(self):
-        return self._branchName
-
-    @branchName.setter
-    def branchName(self, value):
-        self._branchName = value
-
-    @property
     def repos(self):
         return self._repos
-
-    @property
-    def outputDir(self):
-        return self._outputDir
-
-    @outputDir.setter
-    def outputDir(self, value):
-        self._outputDir = value
 
     def __getLogin(self):
         return self.getLoginWithGraphQL().json().get("data").get("viewer").get("login")
