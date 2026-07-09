@@ -11,3 +11,4 @@ notes.md
 .pytest_cache/
 .coverage
 htmlcov/
+*.egg-info/
