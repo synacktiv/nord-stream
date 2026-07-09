@@ -67,7 +67,6 @@ from docopt import docopt
 from nordstream.cicd.github import GitHub
 from nordstream.core.github.github import GitHubWorkflowRunner
 from nordstream.utils.log import logger
-from nordstream.git import Git
 from nordstream.cli.common import configureVerbosity, configureGitIdentity
 
 

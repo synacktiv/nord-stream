@@ -67,7 +67,6 @@ from docopt import docopt
 
 from nordstream.cicd.devops import DevOps
 from nordstream.core.devops.devops import DevOpsRunner
-from nordstream.git import Git
 from nordstream.utils.log import logger
 from nordstream.utils.devops import listOrgs
 from nordstream.cli.common import configureVerbosity, configureGitIdentity

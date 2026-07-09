@@ -117,7 +117,6 @@ class GitLab(BaseClient):
                 executor = "unknown"
                 response = self.session.get(f"{self.url}/api/v4/projects/{id}/jobs/{job['id']}/trace")
                 if response.status_code == 200 and len(response.text) > 0:
-                    regex = r'Preparing the "([^"]+)" executor'
                     match = re.search(r'Preparing the "([^"]+)" executor', response.text)
                     if match:
                         executor = match.group(1)

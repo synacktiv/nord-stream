@@ -59,7 +59,6 @@ from docopt import docopt
 from nordstream.cicd.gitlab import GitLab
 from nordstream.core.gitlab.gitlab import GitLabRunner
 from nordstream.utils.log import logger
-from nordstream.git import Git
 from nordstream.cli.common import configureVerbosity, configureGitIdentity
 
 
