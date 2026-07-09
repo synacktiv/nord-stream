@@ -10,6 +10,15 @@ from nordstream.utils.helpers import isAllowed
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.parsers.devops import decode_double_b64, extract_github_authorization
+from nordstream.report.devops import (
+    displayProject,
+    displayRepository,
+    displayUser,
+    displayVariableGroup,
+    displaySecureFile,
+    displayServiceConnection,
+    displayFailureReasons,
+)
 
 
 class DevOpsRunner:
@@ -156,30 +165,19 @@ class DevOpsRunner:
     def listDevOpsProjects(self):
         logger.info("Listing all projects:")
         for p in self._cicd.projects:
-            name = p.get("name")
-            logger.raw(f"- {name}\n", level=logging.INFO)
+            displayProject(p.get("name"))
 
     def listDevOpsRepositories(self):
         logger.info("Listing all repositories:")
         for p in self._cicd.projects:
             project_name = p.get("name")
             for r in self._cicd.listRepositories(project_name):
-                name = r.get("name")
-                logger.raw(f"- {project_name}/{name}\n", level=logging.INFO)
+                displayRepository(project_name, r.get("name"))
 
     def listDevOpsUsers(self):
         logger.info("Listing all users:")
         for p in self._cicd.listUsers():
-            origin = p.get("origin")
-            displayName = p.get("displayName")
-            mailAddress = p.get("mailAddress")
-            res = f"- {displayName}"
-
-            if mailAddress != "":
-                res += f" / {mailAddress}"
-
-            res += f" ({origin})\n"
-            logger.raw(res, level=logging.INFO)
+            displayUser(p)
 
     def getProjects(self, project):
         if project:
@@ -223,9 +221,7 @@ class DevOpsRunner:
         else:
             if len(secrets) != 0:
                 for variableGroup in secrets:
-                    logger.info(f"Variable group: \"{variableGroup.get('name')}\"")
-                    for sec in variableGroup.get("variables"):
-                        logger.raw(f"\t- {sec}\n", logging.INFO)
+                    displayVariableGroup(variableGroup)
 
     def __displayProjectSecureFiles(self, project):
 
@@ -236,7 +232,7 @@ class DevOpsRunner:
         else:
             if secureFiles:
                 for sf in secureFiles:
-                    logger.info(f'Secure file: "{sf["name"]}"')
+                    displaySecureFile(sf)
 
     def __displayServiceConnections(self, projectId):
 
@@ -248,9 +244,7 @@ class DevOpsRunner:
             if len(serviceConnections) != 0:
                 logger.info("Service connections:")
                 for sc in serviceConnections:
-                    scType = sc.get("type")
-                    scName = sc.get("name")
-                    logger.raw(f"\t- {scName} ({scType})\n", logging.INFO)
+                    displayServiceConnection(sc)
 
     def __checkSecrets(self, project):
         projectId = project.get("id")
@@ -381,9 +375,7 @@ class DevOpsRunner:
             pass
 
     def __displayFailureReasons(self, projectId, runId):
-        logger.error("Workflow failure:")
-        for reason in self._cicd.getFailureReason(projectId, runId):
-            logger.error(f"{reason}")
+        displayFailureReasons(self._cicd.getFailureReason(projectId, runId))
 
     def __extractVariableGroupsSecrets(self, projectId, pipelineId):
         logger.verbose(f"Getting variable groups secrets")
