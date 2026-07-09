@@ -1,5 +1,4 @@
 import logging
-import base64
 import glob
 from zipfile import ZipFile
 from os import makedirs, chdir
@@ -12,6 +11,7 @@ from nordstream.core.github.protections import (
     resetRestrictions,
 )
 from nordstream.core.github.display import *
+from nordstream.parsers.github import decode_workflow_secret_line
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.utils.helpers import randomString
@@ -201,13 +201,14 @@ class GitHubWorkflowRunner:
         filePath = self.__getWorkflowOutputFileName(repo)
         if filePath:
             with open(filePath, "r") as output:
-                # well it's working
-                data = output.readlines()[-1].split(" ")[1]
+                lastLine = output.readlines()[-1]
 
-                try:
-                    secrets = base64.b64decode(base64.b64decode(data))
-                except Exception as e:
-                    logger.exception(e)
+            try:
+                secrets = decode_workflow_secret_line(lastLine)
+            except ValueError as e:
+                logger.exception(e)
+                return
+
             logger.success(f"{informationType}:")
             logger.raw(secrets, logging.INFO)
 
