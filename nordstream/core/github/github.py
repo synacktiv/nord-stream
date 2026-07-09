@@ -12,6 +12,7 @@ from nordstream.core.github.protections import (
 )
 from nordstream.report.github import *
 from nordstream.parsers.github import decode_workflow_secret_line
+from nordstream.core.base import BaseRunner
 from nordstream.utils.errors import GitHubError, GitPushError, GitHubBadCredentials
 from nordstream.utils.log import logger, NordStreamLog
 from nordstream.utils.helpers import randomString
@@ -20,8 +21,7 @@ from nordstream.git import Git
 import subprocess
 
 
-class GitHubWorkflowRunner:
-    _cicd = None
+class GitHubWorkflowRunner(BaseRunner):
     _taskName = "command"
     _workflowFilename = DEFAULT_WORKFLOW_FILENAME
     _fileName = None
@@ -39,12 +39,10 @@ class GitHubWorkflowRunner:
     _forceDeploy = False
     _disableProtections = None
     _writeAccessFilter = False
-    _branchAlreadyExists = False
-    _pushedCommitsCount = 0
     _cleanLogs = True
 
     def __init__(self, cicd, env):
-        self._cicd = cicd
+        super().__init__(cicd)
         self._env = env
         self.__createLogDir()
 
@@ -558,17 +556,6 @@ class GitHubWorkflowRunner:
         if self._extractEnv:
             self.__extractSecretsFromEnv(repo)
 
-    def __deleteRemoteBranch(self):
-        logger.verbose("Deleting remote branch")
-        deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)
-        deleteOutput.wait()
-
-        if deleteOutput.returncode != 0:
-            logger.error(f"Error deleting remote branch {self._cicd.branchName}")
-            logger.raw(deleteOutput.communicate()[1], logging.INFO)
-            return False
-        return True
-
     def __clean(self, repo, cleanRemoteLogs=True):
 
         if self._pushedCommitsCount > 0:
@@ -589,7 +576,7 @@ class GitHubWorkflowRunner:
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                 Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
-                if not self.__deleteRemoteBranch():
+                if not self._deleteRemoteBranch():
                     logger.info("Cleaning remote branch.")
                     # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                     Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)

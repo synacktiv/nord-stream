@@ -10,6 +10,7 @@ from nordstream.utils.helpers import isAllowed
 from nordstream.utils.log import logger
 from nordstream.yaml.devops import DevOpsPipelineGenerator
 from nordstream.parsers.devops import decode_double_b64, extract_github_authorization
+from nordstream.core.base import BaseRunner
 from nordstream.report.devops import (
     displayProject,
     displayRepository,
@@ -21,8 +22,7 @@ from nordstream.report.devops import (
 )
 
 
-class DevOpsRunner:
-    _cicd = None
+class DevOpsRunner(BaseRunner):
     _extractVariableGroups = True
     _extractSecureFiles = True
     _extractAzureServiceconnections = True
@@ -38,12 +38,10 @@ class DevOpsRunner:
     _output = None
     _cleanLogs = True
     _resType = {"default": 0, "doubleb64": 1, "github": 2, "azurerm": 3}
-    _pushedCommitsCount = 0
-    _branchAlreadyExists = False
     _allowedTypes = ["azurerm", "github", "aws", "sonarqube", "ssh"]
 
     def __init__(self, cicd):
-        self._cicd = cicd
+        super().__init__(cicd)
         self.__createLogDir()
 
     @property
@@ -634,17 +632,6 @@ class DevOpsRunner:
 
         raise RepoCreationError("No repo found")
 
-    def __deleteRemoteBranch(self):
-        logger.verbose("Deleting remote branch")
-        deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)
-        deleteOutput.wait()
-
-        if deleteOutput.returncode != 0:
-            logger.error(f"Error deleting remote branch {self._cicd.branchName}")
-            logger.raw(deleteOutput.communicate()[1], logging.INFO)
-            return False
-        return True
-
     def __clean(self, projectId, repoId, deleteRemoteRepo, deleteRemotePipeline):
         if self._cleanLogs:
             if deleteRemotePipeline:
@@ -666,7 +653,7 @@ class DevOpsRunner:
                 if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                     Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
                 else:
-                    if not self.__deleteRemoteBranch():
+                    if not self._deleteRemoteBranch():
                         logger.info("Cleaning remote branch.")
                         # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                         Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)

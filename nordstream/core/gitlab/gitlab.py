@@ -10,6 +10,7 @@ import time
 from nordstream.utils.errors import GitLabError
 from nordstream.yaml.gitlab import GitLabPipelineGenerator
 from nordstream.parsers.gitlab import merge_runners
+from nordstream.core.base import BaseRunner
 from nordstream.report.gitlab import (
     displayRunner,
     displayVariable,
@@ -23,14 +24,12 @@ from nordstream.report.gitlab import (
 )
 
 
-class GitLabRunner:
-    _cicd = None
+class GitLabRunner(BaseRunner):
     _writeAccessFilter = False
     _extractProject = True
     _extractGroup = True
     _extractInstance = True
     _yaml = None
-    _branchAlreadyExists = False
     _fileName = None
     _cleanLogs = True
     _sleepTime = 0
@@ -112,7 +111,7 @@ class GitLabRunner:
             logger.critical("Invalid local project path.")
 
     def __init__(self, cicd):
-        self._cicd = cicd
+        super().__init__(cicd)
         self.__createLogDir()
 
     def __createLogDir(self):
@@ -475,7 +474,7 @@ class GitLabRunner:
             if self._branchAlreadyExists and self._cicd.branchName != self._cicd.defaultBranchName:
                 Git.gitUndoLastPushedCommits(self._cicd.branchName, self._pushedCommitsCount)
             else:
-                if not self.__deleteRemoteBranch():
+                if not self._deleteRemoteBranch():
                     logger.info("Cleaning remote branch.")
                     # rm everything if we can't delete the branch (only leave one file otherwise it will try to rm the branch)
                     Git.gitCleanRemote(self._cicd.branchName, leaveOneFile=True)
@@ -485,17 +484,6 @@ class GitLabRunner:
         for project in self._cicd.projects:
             logger.info(f"Cleaning logs for project: {project.get('path_with_namespace')}")
             self._cicd.cleanAllLogs(project.get("id"))
-
-    def __deleteRemoteBranch(self):
-        logger.verbose("Deleting remote branch")
-        deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)
-        deleteOutput.wait()
-
-        if deleteOutput.returncode != 0:
-            logger.error(f"Error deleting remote branch {self._cicd.branchName}")
-            logger.raw(deleteOutput.communicate()[1], logging.INFO)
-            return False
-        return True
 
     def describeToken(self):
         response = self._cicd.getUser()
