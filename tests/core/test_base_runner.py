@@ -38,6 +38,34 @@ def test_delete_remote_branch_returns_false_on_failure():
         assert runner._deleteRemoteBranch() is False
 
 
+def _push_proc(returncode, stderr):
+    proc = MagicMock()
+    proc.returncode = returncode
+    proc.communicate.return_value = (b"", stderr)
+    return proc
+
+
+def test_push_code_success_increments_counter():
+    runner = BaseRunner(_FakeCICD())
+    with patch("nordstream.core.base.Git.gitPush", return_value=_push_proc(0, b"main -> main")):
+        assert runner._pushCode() is True
+    assert runner._pushedCommitsCount == 1
+
+
+def test_push_code_everything_up_to_date_returns_false():
+    runner = BaseRunner(_FakeCICD())
+    with patch("nordstream.core.base.Git.gitPush", return_value=_push_proc(0, b"Everything up-to-date")):
+        assert runner._pushCode() is False
+    assert runner._pushedCommitsCount == 0
+
+
+def test_push_code_nonzero_returncode_returns_false():
+    runner = BaseRunner(_FakeCICD())
+    with patch("nordstream.core.base.Git.gitPush", return_value=_push_proc(1, b"rejected")):
+        assert runner._pushCode() is False
+    assert runner._pushedCommitsCount == 0
+
+
 def test_all_platform_runners_subclass_base_runner():
     from nordstream.core.github.github import GitHubWorkflowRunner
     from nordstream.core.gitlab.gitlab import GitLabRunner

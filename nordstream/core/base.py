@@ -40,6 +40,31 @@ class BaseRunner:
         self._cicd.outputDir = realpath(self._cicd.outputDir) + f"/{subdir}"
         makedirs(self._cicd.outputDir, exist_ok=True)
 
+    def _pushCode(self):
+        """Push the working tree to the deployment branch.
+
+        Returns True on a successful push (and bumps the pushed-commit counter),
+        or False when the branch is already up to date or the push failed.
+        Callers that require the push to happen (e.g. GitHub) raise on False.
+        """
+        pushOutput = Git.gitPush(self._cicd.branchName)
+        pushOutput.wait()
+        stderr = pushOutput.communicate()[1]
+
+        if b"Everything up-to-date" in stderr.strip():
+            logger.error("Error when pushing code: Everything up-to-date")
+            logger.warning("Your trying to push the same code on an existing branch, modify the yaml file to push it.")
+            return False
+
+        if pushOutput.returncode != 0:
+            logger.error("Error when pushing code:")
+            logger.raw(stderr, logging.INFO)
+            return False
+
+        self._pushedCommitsCount += 1
+        logger.raw(stderr)
+        return True
+
     def _deleteRemoteBranch(self):
         logger.verbose("Deleting remote branch")
         deleteOutput = Git.gitDeleteRemote(self._cicd.branchName)

@@ -230,26 +230,10 @@ class GitHubWorkflowRunner(BaseRunner):
 
         workflowGenerator.writeFile(f".github/workflows/{self.workflowFilename}")
 
-        pushOutput = Git.gitPush(self._cicd.branchName)
-        pushOutput.wait()
-
-        if b"Everything up-to-date" in pushOutput.communicate()[1].strip():
-            logger.error("Error when pushing code: Everything up-to-date")
-            logger.warning("Your trying to push the same code on an existing branch, modify the yaml file to push it.")
+        if not self._pushCode():
             raise GitPushError
 
-        elif pushOutput.returncode != 0:
-            logger.error("Error when pushing code:")
-            logger.raw(pushOutput.communicate()[1], logging.INFO)
-            raise GitPushError
-
-        else:
-            self._pushedCommitsCount += 1
-
-            logger.raw(pushOutput.communicate()[1])
-            workflowId, workflowConclusion = self._cicd.waitWorkflow(repo, self.workflowFilename)
-
-            return workflowId, workflowConclusion
+        return self._cicd.waitWorkflow(repo, self.workflowFilename)
 
     def __postProcessingWorkflow(self, repo, workflowId, workflowConclusion, outputName):
 
