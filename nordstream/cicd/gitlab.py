@@ -147,34 +147,30 @@ class GitLab(BaseClient):
 
         return res
 
-    def listVariablesFromProject(self, project):
-        id = project.get("id")
+    def __listVariables(self, url, outputName):
+        """Fetch CI/CD variables from ``url`` and dump them to ``outputName``/secrets.txt."""
         res = []
-
-        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{id}/variables")
+        status_code, response = self.__paginatedGet(url)
 
         if status_code == 200 and len(response) > 0:
+            path = self.__createOutputDir(outputName)
 
-            path = self.__createOutputDir(project.get("path_with_namespace"))
+            with open(f"{path}/secrets.txt", "w") as f:
+                for variable in response:
+                    secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
+                    secret["hidden"] = variable["hidden"] if variable.get("hidden") is not None else "N/A"
+                    res.append(secret)
+                    f.write(f"{variable['key']}={variable['value']}\n")
 
-            f = open(f"{path}/secrets.txt", "w")
-
-            for variable in response:
-                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
-
-                if variable.get("hidden") is not None:
-                    secret["hidden"] = variable["hidden"]
-                else:
-                    secret["hidden"] = "N/A"
-
-                res.append(secret)
-
-                f.write(f"{variable['key']}={variable['value']}\n")
-
-            f.close()
         elif status_code == 403:
             raise GitLabError(response.get("message"))
         return res
+
+    def listVariablesFromProject(self, project):
+        return self.__listVariables(
+            f"{self.url}/api/v4/projects/{project.get('id')}/variables",
+            project.get("path_with_namespace"),
+        )
 
     def listInheritedVariablesFromProject(self, project):
         id = project.get("id")
@@ -272,60 +268,13 @@ class GitLab(BaseClient):
         return res
 
     def listVariablesFromGroup(self, group):
-        id = group.get("id")
-        res = []
-
-        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/groups/{id}/variables")
-
-        if status_code == 200 and len(response) > 0:
-
-            path = self.__createOutputDir(group.get("full_path"))
-
-            f = open(f"{path}/secrets.txt", "w")
-
-            for variable in response:
-                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
-
-                if variable.get("hidden") is not None:
-                    secret["hidden"] = variable["hidden"]
-                else:
-                    secret["hidden"] = "N/A"
-
-                res.append(secret)
-
-                f.write(f"{variable['key']}={variable['value']}\n")
-
-            f.close()
-        elif status_code == 403:
-            raise GitLabError(response.get("message"))
-        return res
+        return self.__listVariables(
+            f"{self.url}/api/v4/groups/{group.get('id')}/variables",
+            group.get("full_path"),
+        )
 
     def listVariablesFromInstance(self):
-        res = []
-        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/admin/ci/variables")
-
-        if status_code == 200 and len(response) > 0:
-
-            path = self.__createOutputDir("")
-
-            f = open(f"{path}/secrets.txt", "w")
-
-            for variable in response:
-                secret = {"key": variable["key"], "value": variable["value"], "protected": variable["protected"]}
-
-                if variable.get("hidden") is not None:
-                    secret["hidden"] = variable["hidden"]
-                else:
-                    secret["hidden"] = "N/A"
-
-                res.append(secret)
-
-                f.write(f"{variable['key']}={variable['value']}\n")
-
-            f.close()
-        elif status_code == 403:
-            raise GitLabError(response.get("message"))
-        return res
+        return self.__listVariables(f"{self.url}/api/v4/admin/ci/variables", "")
 
     def addProjects(self, project=None, filterWrite=False, strict=False, membership=False):
         params = {}

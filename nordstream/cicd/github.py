@@ -144,57 +144,25 @@ class GitHub(BaseClient):
             res.append(env.get("name"))
         return res
 
+    def __listSecretNames(self, url):
+        return [sec.get("name") for sec in self.__paginatedGet(url, data="secrets")]
+
     def listSecretsFromEnv(self, repo, env):
         logger.debug(f"Getting environment secrets for {repo}: {env}")
         envReq = urllib.parse.quote(env, safe="")
-        res = []
-
-        response = self.__paginatedGet(f"{self._repoURL}/{repo}/environments/{envReq}/secrets", data="secrets")
-
-        for sec in response:
-            res.append(sec.get("name"))
-
-        return res
+        return self.__listSecretNames(f"{self._repoURL}/{repo}/environments/{envReq}/secrets")
 
     def listSecretsFromRepo(self, repo):
-        res = []
-
-        response = self.__paginatedGet(f"{self._repoURL}/{repo}/actions/secrets", data="secrets")
-
-        for sec in response:
-            res.append(sec.get("name"))
-
-        return res
+        return self.__listSecretNames(f"{self._repoURL}/{repo}/actions/secrets")
 
     def listOrganizationSecretsFromRepo(self, repo):
-        res = []
-
-        response = self.__paginatedGet(f"{self._repoURL}/{repo}/actions/organization-secrets", data="secrets")
-
-        for sec in response:
-            res.append(sec.get("name"))
-
-        return res
+        return self.__listSecretNames(f"{self._repoURL}/{repo}/actions/organization-secrets")
 
     def listDependabotSecretsFromRepo(self, repo):
-        res = []
-
-        response = self.__paginatedGet(f"{self._repoURL}/{repo}/dependabot/secrets", data="secrets")
-
-        for sec in response:
-            res.append(sec.get("name"))
-
-        return res
+        return self.__listSecretNames(f"{self._repoURL}/{repo}/dependabot/secrets")
 
     def listDependabotOrganizationSecrets(self):
-        res = []
-
-        response = self.__paginatedGet(f"https://api.github.com/orgs/{self.org}/dependabot/secrets", data="secrets")
-
-        for sec in response:
-            res.append(sec.get("name"))
-
-        return res
+        return self.__listSecretNames(f"https://api.github.com/orgs/{self.org}/dependabot/secrets")
 
     def listEnvProtections(self, repo, env):
         logger.debug("Getting environment protections")

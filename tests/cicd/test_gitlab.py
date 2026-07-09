@@ -56,6 +56,19 @@ def test_list_variables_from_project_parses_and_defaults_hidden(tmp_path):
 
 
 @responses.activate
+def test_list_variables_from_group_uses_group_endpoint(tmp_path):
+    client = _make_client(tmp_path)
+    url = f"{BASE}/api/v4/groups/7/variables"
+    responses.add(
+        responses.GET, url, json=[{"key": "GK", "value": "GV", "protected": False, "hidden": True}], status=200
+    )
+    responses.add(responses.GET, url, json=[], status=200)
+
+    result = client.listVariablesFromGroup({"id": 7, "full_path": "grp"})
+    assert result == [{"key": "GK", "value": "GV", "protected": False, "hidden": True}]
+
+
+@responses.activate
 def test_list_variables_from_instance_raises_on_403(tmp_path):
     client = _make_client(tmp_path)
     responses.add(
