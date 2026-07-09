@@ -3,6 +3,7 @@ import time
 import re
 import sys
 from os import makedirs
+from nordstream.cicd.base import BaseClient
 from nordstream.utils.log import logger
 from nordstream.utils.errors import GitLabError
 from nordstream.git import Git
@@ -13,27 +14,19 @@ from nordstream.utils.helpers import isGitLabSessionCookie
 requests.packages.urllib3.disable_warnings()
 
 
-class GitLab:
-    _DEFAULT_BRANCH_NAME = DEFAULT_BRANCH_NAME
-    _auth = None
-    _session = None
-    _token = None
-    _projects = []
-    _groups = []
-    _outputDir = OUTPUT_DIR
+class GitLab(BaseClient):
     _headers = {
         "User-Agent": USER_AGENT,
     }
     _cookies = {}
-    _gitlabURL = None
-    _branchName = _DEFAULT_BRANCH_NAME
     _sleepTime = 15
     _maxRetry = 10
 
     def __init__(self, url, token, verifCert):
+        super().__init__(token)
         self._gitlabURL = url.strip("/")
-        self._token = token
-        self._session = requests.Session()
+        self._projects = []
+        self._groups = []
         self._session.verify = verifCert
         self.setCookiesAndHeaders()
         self._gitlabLogin = self.__getLogin()
@@ -47,32 +40,8 @@ class GitLab:
         return self._groups
 
     @property
-    def token(self):
-        return self._token
-
-    @property
     def url(self):
         return self._gitlabURL
-
-    @property
-    def outputDir(self):
-        return self._outputDir
-
-    @outputDir.setter
-    def outputDir(self, value):
-        self._outputDir = value
-
-    @property
-    def defaultBranchName(self):
-        return self._DEFAULT_BRANCH_NAME
-
-    @property
-    def branchName(self):
-        return self._branchName
-
-    @branchName.setter
-    def branchName(self, value):
-        self._branchName = value
 
     @classmethod
     def checkToken(cls, token, gitlabURL, verifyCert):
