@@ -69,5 +69,5 @@ def test_list_projects_parses_across_pages():
 def test_projects_is_per_instance_not_shared():
     a = _make_client()
     b = _make_client()
-    a._projects.append({"id": "x", "name": "X"})
+    a.projects.append({"id": "x", "name": "X"})
     assert b.projects == []

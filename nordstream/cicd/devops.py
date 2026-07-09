@@ -14,7 +14,7 @@ requests.packages.urllib3.disable_warnings()
 
 
 class DevOps(BaseClient):
-    _DEFAULT_PIPELINE_NAME = DEFAULT_PIPELINE_NAME
+    defaultPipelineName = DEFAULT_PIPELINE_NAME
     _baseURL = "https://dev.azure.com/"
     _header = {
         "Accept": "application/json; api-version=6.0-preview",
@@ -25,47 +25,15 @@ class DevOps(BaseClient):
 
     def __init__(self, token, org, verifCert):
         super().__init__(token)
-        self._org = org
+        self.org = org
         self._baseURL = self._baseURL + f"{org}/"
-        self._projects = []
-        self._repoName = DEFAULT_REPO_NAME
-        self._pipelineName = self._DEFAULT_PIPELINE_NAME
-        self._defaultAgentPool = None
+        self.projects = []
+        self.repoName = DEFAULT_REPO_NAME
+        self.pipelineName = self.defaultPipelineName
+        self.defaultAgentPool = None
         self.setCookiesAndHeaders()
-        self._session.verify = verifCert
+        self.session.verify = verifCert
         self._devopsLoginId = self.__getLogin()
-
-    @property
-    def projects(self):
-        return self._projects
-
-    @property
-    def org(self):
-        return self._org
-
-    @property
-    def repoName(self):
-        return self._repoName
-
-    @repoName.setter
-    def repoName(self, value):
-        self._repoName = value
-
-    @property
-    def pipelineName(self):
-        return self._pipelineName
-
-    @pipelineName.setter
-    def pipelineName(self, value):
-        self._pipelineName = value
-
-    @property
-    def defaultAgentPool(self):
-        return self._defaultAgentPool
-
-    @defaultAgentPool.setter
-    def defaultAgentPool(self, value):
-        self._defaultAgentPool = value
 
     @property
     def sleepTime(self):
@@ -75,25 +43,21 @@ class DevOps(BaseClient):
     def sleepTime(self, value):
         self._sleepTime = int(value)
 
-    @property
-    def defaultPipelineName(self):
-        return self._DEFAULT_PIPELINE_NAME
-
     def __getLogin(self):
         return self.getUser().get("authenticatedUser").get("id")
 
     def getUser(self):
         logger.debug("Retrieving user informations")
-        return self._session.get(
+        return self.session.get(
             f"{self._baseURL}/_apis/ConnectionData",
         ).json()
 
     def setCookiesAndHeaders(self):
-        if isAZDOBearerToken(self._token):
-            self._session.headers.update({"Authorization": f"Bearer {self._token}"})
+        if isAZDOBearerToken(self.token):
+            self.session.headers.update({"Authorization": f"Bearer {self.token}"})
         else:
-            self._session.auth = ("", self._token)
-        self._session.headers.update(self._header)
+            self.session.auth = ("", self.token)
+        self.session.headers.update(self._header)
 
     def listProjects(self):
         logger.debug("Listing projects")
@@ -101,7 +65,7 @@ class DevOps(BaseClient):
         # Azure DevOps pagination
         while True:
             params = {"continuationToken": continuationToken}
-            response = self._session.get(
+            response = self.session.get(
                 f"{self._baseURL}/_apis/projects",
                 params=params,
             ).json()
@@ -109,7 +73,7 @@ class DevOps(BaseClient):
             if len(response.get("value")) != 0:
                 for repo in response.get("value"):
                     p = {"id": repo.get("id"), "name": repo.get("name")}
-                    self._projects.append(p)
+                    self.projects.append(p)
                 continuationToken += response.get("count")
             else:
                 break
@@ -123,8 +87,8 @@ class DevOps(BaseClient):
         while True:
             if continuationToken:
                 params = {"continuationToken": continuationToken}
-            response = self._session.get(
-                f"https://vssps.dev.azure.com/{self._org}/_apis/graph/users",
+            response = self.session.get(
+                f"https://vssps.dev.azure.com/{self.org}/_apis/graph/users",
                 params=params,
             )
 
@@ -155,8 +119,8 @@ class DevOps(BaseClient):
         while True:
             if continuationToken:
                 params = {"continuationToken": continuationToken}
-            response = self._session.get(
-                f"https://vssps.dev.azure.com/{self._org}/_apis/graph/groups",
+            response = self.session.get(
+                f"https://vssps.dev.azure.com/{self.org}/_apis/graph/groups",
                 params=params,
             )
 
@@ -164,7 +128,7 @@ class DevOps(BaseClient):
             response = response.json()
 
             if len(response.get("value")) != 0:
-                for project in self._projects:
+                for project in self.projects:
                     for group in response.get("value"):
                         name = project.get("name")
                         if self.__checkProjectPrivs(self._devopsLoginId, name, group):
@@ -181,7 +145,7 @@ class DevOps(BaseClient):
 
             else:
                 break
-        self._projects = res
+        self.projects = res
 
     def __checkProjectPrivs(self, login, projectName, group):
         groupPrincipalName = group.get("principalName")
@@ -200,8 +164,8 @@ class DevOps(BaseClient):
                 while True:
                     if pagingToken:
                         params = {"pagingToken": pagingToken}
-                    response = self._session.get(
-                        f"https://vsaex.dev.azure.com/{self._org}/_apis/GroupEntitlements/{originId}/members",
+                    response = self.session.get(
+                        f"https://vsaex.dev.azure.com/{self.org}/_apis/GroupEntitlements/{originId}/members",
                         params=params,
                     ).json()
 
@@ -216,14 +180,14 @@ class DevOps(BaseClient):
 
     def listRepositories(self, project):
         logger.debug("Listing repositories")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{project}/_apis/git/repositories",
         ).json()
         return response.get("value")
 
     def listPipelines(self, project):
         logger.debug("Listing pipelines")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{project}/_apis/pipelines",
         ).json()
         return response.get("value")
@@ -231,13 +195,13 @@ class DevOps(BaseClient):
     def addProject(self, project):
         logger.debug(f"Checking project: {project}")
 
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/_apis/projects/{project}",
         ).json()
 
         if response.get("id"):
             p = {"id": response.get("id"), "name": response.get("name")}
-            self._projects.append(p)
+            self.projects.append(p)
 
     @classmethod
     def checkToken(cls, token, org, verifCert):
@@ -258,7 +222,7 @@ class DevOps(BaseClient):
 
     def listProjectVariableGroupsSecrets(self, project):
         logger.debug(f"Listing variable groups for: {project}")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{project}/_apis/distributedtask/variablegroups",
         )
 
@@ -281,7 +245,7 @@ class DevOps(BaseClient):
 
     def listProjectSecureFiles(self, project):
         logger.debug(f"Listing secure files for: {project}")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{project}/_apis/distributedtask/securefiles",
         )
 
@@ -301,7 +265,7 @@ class DevOps(BaseClient):
         resourceId = resource["id"]
 
         logger.debug(f"Checking current pipeline permissions for: \"{resource['name']}\"")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{projectId}/_apis/pipelines/pipelinePermissions/{resourceType}/{resourceId}",
         ).json()
 
@@ -314,7 +278,7 @@ class DevOps(BaseClient):
                 return True
 
         logger.debug(f"\"{resource['name']}\" has restricted permissions. Adding access permissions for the pipeline")
-        response = self._session.patch(
+        response = self.session.patch(
             f"{self._baseURL}/{projectId}/_apis/pipelines/pipelinePermissions/{resourceType}/{resourceId}",
             json={"pipelines": [{"id": pipelineId, "authorized": True}]},
         )
@@ -326,8 +290,8 @@ class DevOps(BaseClient):
 
     def createGit(self, project):
         logger.debug(f"Creating git repo for: {project}")
-        data = {"name": self._repoName, "project": {"id": project}}
-        response = self._session.post(
+        data = {"name": self.repoName, "project": {"id": project}}
+        response = self.session.post(
             f"{self._baseURL}/{project}/_apis/git/repositories",
             json=data,
         ).json()
@@ -336,7 +300,7 @@ class DevOps(BaseClient):
 
     def deleteGit(self, project, repoId):
         logger.debug(f"Deleting git repo for: {project}")
-        response = self._session.delete(
+        response = self.session.delete(
             f"{self._baseURL}/{project}/_apis/git/repositories/{repoId}",
         )
         return response.status_code == 204
@@ -345,34 +309,34 @@ class DevOps(BaseClient):
         logger.debug("Creating pipeline")
         data = {
             "folder": None,
-            "name": self._pipelineName,
+            "name": self.pipelineName,
             "configuration": {
                 "type": "yaml",
                 "path": path,
                 "repository": {
                     "id": repoId,
                     "type": "azureReposGit",
-                    "defaultBranch": self._branchName,
+                    "defaultBranch": self.branchName,
                 },
             },
         }
-        response = self._session.post(
+        response = self.session.post(
             f"{self._baseURL}/{project}/_apis/pipelines",
             json=data,
         ).json()
         pipeline_id = response.get("id")
 
-        if self._defaultAgentPool:
+        if self.defaultAgentPool:
             logger.debug("Setting default agent pool")
             # Retrieve project queues, not organization pools, for Default agent pool
             queues_url = f"{self._baseURL}/{project}/_apis/distributedtask/queues"
-            response = self._session.get(queues_url)
+            response = self.session.get(queues_url)
             queues = response.json()
 
             queue_id = None
             queue_name = None
             for queue in queues["value"]:
-                if queue["pool"]["name"] == self._defaultAgentPool:
+                if queue["pool"]["name"] == self.defaultAgentPool:
                     queue_id = queue["id"]
                     queue_name = queue["name"]
                     logger.info(f"Queue found : {queue_name} (Queue ID: {queue_id}, Pool ID: {queue['pool']['id']})")
@@ -380,20 +344,20 @@ class DevOps(BaseClient):
 
             if not queue_id:
                 logger.error(
-                    f"Queue {self._defaultAgentPool} not found for default agent pool, or not accessible by the project. Not updating"
+                    f"Queue {self.defaultAgentPool} not found for default agent pool, or not accessible by the project. Not updating"
                 )
                 return pipeline_id
 
             # Update pipeline Default agent with specified queue, via the definitions API
             update_url = f"{self._baseURL}/{project}/_apis/build/definitions/{pipeline_id}"
 
-            response = self._session.get(update_url)
+            response = self.session.get(update_url)
             definition = response.json()
 
             # Add default pool agent with queue
             definition["queue"] = {"id": queue_id, "name": queue_name}
 
-            response = self._session.put(update_url, json=definition)
+            response = self.session.put(update_url, json=definition)
 
         return pipeline_id
 
@@ -401,10 +365,10 @@ class DevOps(BaseClient):
         logger.debug(f"Running pipeline: {pipelineId}")
         params = {
             "definition": {"id": pipelineId},
-            "sourceBranch": f"refs/heads/{self._branchName}",
+            "sourceBranch": f"refs/heads/{self.branchName}",
         }
 
-        response = self._session.post(
+        response = self.session.post(
             f"{self._baseURL}/{project}/_apis/build/Builds",
             json=params,
         ).json()
@@ -415,7 +379,7 @@ class DevOps(BaseClient):
         logger.debug(f"Getting builds.")
 
         return (
-            self._session.get(
+            self.session.get(
                 f"{self._baseURL}/{project}/_apis/build/Builds",
             )
             .json()
@@ -424,7 +388,7 @@ class DevOps(BaseClient):
 
     def __getBuildSources(self, project, buildId):
 
-        return self._session.get(
+        return self.session.get(
             f"{self._baseURL}/{project}/_apis/build/Builds/{buildId}/sources",
         ).json()
 
@@ -465,7 +429,7 @@ class DevOps(BaseClient):
                 logger.warning(f"Pipeline still running, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
 
-            response = self._session.get(
+            response = self.session.get(
                 f"{self._baseURL}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}",
                 json={},
             ).json()
@@ -478,7 +442,7 @@ class DevOps(BaseClient):
         return None
 
     def __createPipelineOutputDir(self, projectName):
-        makedirs(f"{self._outputDir}/{self._org}/{projectName}", exist_ok=True)
+        makedirs(f"{self.outputDir}/{self.org}/{projectName}", exist_ok=True)
 
     def downloadPipelineOutput(self, projectId, runId):
         self.__createPipelineOutputDir(projectId)
@@ -489,7 +453,7 @@ class DevOps(BaseClient):
                 logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
 
-            buildTimeline = self._session.get(
+            buildTimeline = self.session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/timeline",
                 json={},
             ).json()
@@ -532,7 +496,7 @@ class DevOps(BaseClient):
                 logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
 
-            logOutput = self._session.get(
+            logOutput = self.session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/logs/{logId}",
                 json={},
             ).json()
@@ -543,7 +507,7 @@ class DevOps(BaseClient):
                 return None
 
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
-        with open(f"{self._outputDir}/{self._org}/{projectId}/pipeline_{date}.log", "w") as f:
+        with open(f"{self.outputDir}/{self.org}/{projectId}/pipeline_{date}.log", "w") as f:
             for line in logOutput.get("value"):
                 f.write(line + "\n")
         f.close()
@@ -566,35 +530,35 @@ class DevOps(BaseClient):
                 ):
                     return buildId
 
-                self._session.delete(
+                self.session.delete(
                     f"{self._baseURL}/{projectId}/_apis/build/builds/{buildId}",
                 )
 
     def __cleanPipeline(self, projectId):
         logger.verbose(f"Removing pipeline.")
 
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{projectId}/_apis/pipelines",
         ).json()
         if response.get("count", 0) != 0:
             for pipeline in response.get("value"):
-                if pipeline.get("name") == self._pipelineName:
+                if pipeline.get("name") == self.pipelineName:
                     pipelineId = pipeline.get("id")
-                    self._session.delete(
+                    self.session.delete(
                         f"{self._baseURL}/{projectId}/_apis/pipelines/{pipelineId}",
                     )
 
     def deletePipeline(self, projectId):
         logger.debug("Deleting pipeline")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{projectId}/_apis/build/Definitions",
             json={},
         ).json()
         if response.get("count", 0) != 0:
             for pipeline in response.get("value"):
-                if pipeline.get("name") == self._pipelineName:
+                if pipeline.get("name") == self.pipelineName:
                     definitionId = pipeline.get("id")
-                    self._session.delete(
+                    self.session.delete(
                         f"{self._baseURL}/{projectId}/_apis/build/definitions/{definitionId}",
                         json={},
                     )
@@ -605,7 +569,7 @@ class DevOps(BaseClient):
     def listServiceConnections(self, projectId):
         logger.debug("Listing service connections")
         res = []
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{projectId}/_apis/serviceendpoint/endpoints",
             json={},
         )
@@ -622,14 +586,14 @@ class DevOps(BaseClient):
     def getFailureReason(self, projectId, runId):
         res = []
 
-        response = self._session.get(
+        response = self.session.get(
             f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}",
         ).json()
         for result in response.get("validationResults"):
             res.append(result.get("message"))
 
         try:
-            timeline = self._session.get(
+            timeline = self.session.get(
                 f"{self._baseURL}/{projectId}/_apis/build/builds/{runId}/Timeline",
             ).json()
             for record in timeline.get("records", []):

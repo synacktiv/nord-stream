@@ -72,5 +72,5 @@ def test_list_variables_from_instance_raises_on_403(tmp_path):
 def test_projects_is_per_instance_not_shared(tmp_path):
     a = _make_client(tmp_path)
     b = _make_client(tmp_path)
-    a._projects.append({"id": 1})
+    a.projects.append({"id": 1})
     assert b.projects == []

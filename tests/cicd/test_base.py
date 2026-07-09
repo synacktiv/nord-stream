@@ -1,4 +1,3 @@
-import pytest
 import responses
 
 from nordstream.cicd.base import BaseClient
@@ -21,11 +20,9 @@ def test_output_dir_and_branch_are_writable():
     assert client.branchName == "feature/y"
 
 
-def test_default_branch_name_is_read_only():
+def test_default_branch_name_is_the_constant():
     client = BaseClient("tok")
-    # defaultBranchName has no setter
-    with pytest.raises(AttributeError):
-        client.defaultBranchName = "nope"
+    assert client.defaultBranchName == DEFAULT_BRANCH_NAME
 
 
 def test_session_sends_user_agent_header():

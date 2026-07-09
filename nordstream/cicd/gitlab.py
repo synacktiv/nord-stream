@@ -24,24 +24,12 @@ class GitLab(BaseClient):
 
     def __init__(self, url, token, verifCert):
         super().__init__(token)
-        self._gitlabURL = url.strip("/")
-        self._projects = []
-        self._groups = []
-        self._session.verify = verifCert
+        self.url = url.strip("/")
+        self.projects = []
+        self.groups = []
+        self.session.verify = verifCert
         self.setCookiesAndHeaders()
         self._gitlabLogin = self.__getLogin()
-
-    @property
-    def projects(self):
-        return self._projects
-
-    @property
-    def groups(self):
-        return self._groups
-
-    @property
-    def url(self):
-        return self._gitlabURL
 
     @classmethod
     def checkToken(cls, token, gitlabURL, verifyCert):
@@ -77,15 +65,15 @@ class GitLab(BaseClient):
     def getUser(self):
         logger.debug(f"Retrieving user information")
 
-        return self._session.get(f"{self._gitlabURL}/api/v4/user").json()
+        return self.session.get(f"{self.url}/api/v4/user").json()
 
     def setCookiesAndHeaders(self):
-        if isGitLabSessionCookie(self._token):
-            self._session.cookies.update({"_gitlab_session": self._token})
+        if isGitLabSessionCookie(self.token):
+            self.session.cookies.update({"_gitlab_session": self.token})
         else:
-            self._session.headers.update({"PRIVATE-TOKEN": self._token})
+            self.session.headers.update({"PRIVATE-TOKEN": self.token})
 
-        self._session.headers.update(self._headers)
+        self.session.headers.update(self._headers)
 
     def __paginatedGet(self, url, params={}):
 
@@ -99,7 +87,7 @@ class GitLab(BaseClient):
             params["page"] = i
 
             logger.debug(f"Paginated GET request to {url} with parameters {params}")
-            response = self._session.get(url, params=params)
+            response = self.session.get(url, params=params)
 
             if response.status_code == 200:
                 if len(response.json()) == 0:
@@ -117,7 +105,7 @@ class GitLab(BaseClient):
         id = project.get("id")
         res = []
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/jobs")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{id}/jobs")
 
         if status_code == 200 and len(response) > 0:
             for job in response:
@@ -127,7 +115,7 @@ class GitLab(BaseClient):
 
                 # Get executor from job trace
                 executor = "unknown"
-                response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{id}/jobs/{job['id']}/trace")
+                response = self.session.get(f"{self.url}/api/v4/projects/{id}/jobs/{job['id']}/trace")
                 if response.status_code == 200 and len(response.text) > 0:
                     regex = r'Preparing the "([^"]+)" executor'
                     match = re.search(r'Preparing the "([^"]+)" executor', response.text)
@@ -163,7 +151,7 @@ class GitLab(BaseClient):
         id = project.get("id")
         res = []
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/variables")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{id}/variables")
 
         if status_code == 200 and len(response) > 0:
 
@@ -213,7 +201,7 @@ class GitLab(BaseClient):
             """,
         }
 
-        response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL)
+        response = self.session.post(f"{self.url}/api/graphql", json=graphQL)
 
         if response.status_code == 200 and len(response.text) > 0:
             if response.json().get("data", {}).get("project", {}) is None:
@@ -254,7 +242,7 @@ class GitLab(BaseClient):
 
         res = []
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{id}/secure_files")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{id}/secure_files")
         if status_code == 200 and len(response) > 0:
 
             path = self.__createOutputDir(project.get("path_with_namespace"))
@@ -270,9 +258,7 @@ class GitLab(BaseClient):
 
                 f = open(f"{path}/{fileName}", "wb")
 
-                content = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{id}/secure_files/{secFile.get('id')}/download"
-                )
+                content = self.session.get(f"{self.url}/api/v4/projects/{id}/secure_files/{secFile.get('id')}/download")
 
                 # handle large files
                 for chunk in content.iter_content(chunk_size=8192):
@@ -289,7 +275,7 @@ class GitLab(BaseClient):
         id = group.get("id")
         res = []
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/groups/{id}/variables")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/groups/{id}/variables")
 
         if status_code == 200 and len(response) > 0:
 
@@ -316,7 +302,7 @@ class GitLab(BaseClient):
 
     def listVariablesFromInstance(self):
         res = []
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/admin/ci/variables")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/admin/ci/variables")
 
         if status_code == 200 and len(response) > 0:
 
@@ -355,9 +341,9 @@ class GitLab(BaseClient):
             params["min_access_level"] = 30
 
         if not (project and project.isnumeric()):
-            status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects", params)
+            status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects", params)
         else:
-            response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{project}")
+            response = self.session.get(f"{self.url}/api/v4/projects/{project}")
             status_code = response.status_code
             response = [response.json()]
 
@@ -374,7 +360,7 @@ class GitLab(BaseClient):
                     "name": p.get("name"),
                     "path": p.get("path"),
                 }
-                self._projects.append(p)
+                self.projects.append(p)
 
         else:
             logger.error(f"Error while retrieving {f'project: {project}' if project is not None else 'projects'}")
@@ -387,7 +373,7 @@ class GitLab(BaseClient):
             params["search_namespaces"] = True
             params["search"] = group
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/groups", params)
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/groups", params)
 
         if status_code == 200:
             if len(response) == 0:
@@ -399,7 +385,7 @@ class GitLab(BaseClient):
                     "full_path": p.get("full_path"),
                     "name": p.get("name"),
                 }
-                self._groups.append(p)
+                self.groups.append(p)
 
         else:
             logger.error("Error while retrieving groups")
@@ -409,7 +395,7 @@ class GitLab(BaseClient):
         logger.debug(f"Listing users.")
         res = []
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/users")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/users")
 
         if status_code == 200:
             if len(response) == 0:
@@ -431,7 +417,7 @@ class GitLab(BaseClient):
 
     def __createOutputDir(self, name):
         # outputName = name.replace("/", "_")
-        path = f"{self._outputDir}/{name}"
+        path = f"{self.outputDir}/{name}"
         makedirs(path, exist_ok=True)
         return path
 
@@ -440,8 +426,8 @@ class GitLab(BaseClient):
 
         time.sleep(5)
 
-        response = self._session.get(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
+        response = self.session.get(
+            f"{self.url}/api/v4/projects/{projectId}/pipelines?ref={self.branchName}&username={self._gitlabLogin}"
         ).json()
 
         if response[0].get("status") not in COMPLETED_STATES:
@@ -449,8 +435,8 @@ class GitLab(BaseClient):
                 logger.warning(f"Pipeline still running, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
 
-                response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
+                response = self.session.get(
+                    f"{self.url}/api/v4/projects/{projectId}/pipelines?ref={self.branchName}&username={self._gitlabLogin}"
                 ).json()
 
                 if response[0].get("status") in COMPLETED_STATES:
@@ -466,7 +452,7 @@ class GitLab(BaseClient):
     def __getJobs(self, projectId, pipelineId):
 
         status_code, response = self.__paginatedGet(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}/jobs"
+            f"{self.url}/api/v4/projects/{projectId}/pipelines/{pipelineId}/jobs"
         )
 
         if status_code == 403:
@@ -484,7 +470,7 @@ class GitLab(BaseClient):
         jobs = self.__getJobs(projectId, pipelineId)
 
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
-        f = open(f"{self._outputDir}/{projectPath}/pipeline_{date}.log", "w")
+        f = open(f"{self.outputDir}/{projectPath}/pipeline_{date}.log", "w")
 
         if len(jobs) == 0:
             return None
@@ -508,13 +494,13 @@ class GitLab(BaseClient):
 
     def __getTraceForJobId(self, projectId, jobId):
 
-        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
+        response = self.session.get(f"{self.url}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
 
         if response.status_code != 200:
             for i in range(self._maxRetry):
                 logger.warning(f"Output not ready, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
-                response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
+                response = self.session.get(f"{self.url}/api/v4/projects/{projectId}/jobs/{jobId}/trace")
                 if response.status_code == 200:
                     break
                 if i == (self._maxRetry - 1):
@@ -527,15 +513,15 @@ class GitLab(BaseClient):
         logger.debug("Deleting pipeline")
 
         status_code, response = self.__paginatedGet(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines?ref={self._branchName}&username={self._gitlabLogin}"
+            f"{self.url}/api/v4/projects/{projectId}/pipelines?ref={self.branchName}&username={self._gitlabLogin}"
         )
 
         headers = {}
 
         # Get CSRF token when using session cookie otherwise we can't delete a pipeline
-        if isGitLabSessionCookie(self._token):
+        if isGitLabSessionCookie(self.token):
 
-            html_content = self._session.get(f"{self._gitlabURL}/").text
+            html_content = self.session.get(f"{self.url}/").text
             pattern = r'<meta name="csrf-token" content="([^"]+)"'
             match = re.search(pattern, html_content)
             csrf_token = match.group(1)
@@ -546,11 +532,11 @@ class GitLab(BaseClient):
 
             # additional checks for non default branches
             # we don't want to remove legitimate logs
-            if self._branchName != self._DEFAULT_BRANCH_NAME:
+            if self.branchName != self.defaultBranchName:
                 commitId = pipeline.get("sha")
 
-                response = self._session.get(
-                    f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/commits/{commitId}"
+                response = self.session.get(
+                    f"{self.url}/api/v4/projects/{projectId}/repository/commits/{commitId}"
                 ).json()
 
                 if response.get("title") not in [Git.ATTACK_COMMIT_MSG, Git.CLEAN_COMMIT_MSG]:
@@ -566,7 +552,7 @@ class GitLab(BaseClient):
                 "query": "mutation deletePipeline($id: CiPipelineID!) {\n  pipelineDestroy(input: {id: $id}) {\n    errors\n    __typename\n  }\n}\n",
             }
 
-            response = self._session.post(f"{self._gitlabURL}/api/graphql", json=graphQL, headers=headers)
+            response = self.session.post(f"{self.url}/api/graphql", json=graphQL, headers=headers)
 
     def cleanAllLogs(self, projectId):
         # deleting the pipeline removes everything
@@ -581,7 +567,7 @@ class GitLab(BaseClient):
 
             params = {"per_page": 100, "page": i}
 
-            response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/events", params=params)
+            response = self.session.get(f"{self.url}/api/v4/projects/{projectId}/events", params=params)
 
             if response.status_code == 200:
                 if len(response.json()) == 0:
@@ -590,7 +576,7 @@ class GitLab(BaseClient):
                 for event in response.json():
                     eventId = event.get("id")
                     # don't work
-                    response = self._session.delete(f"{self._gitlabURL}/api/v4/projects/{projectId}/events/{eventId}")
+                    response = self.session.delete(f"{self.url}/api/v4/projects/{projectId}/events/{eventId}")
 
                 i += 1
             else:
@@ -600,7 +586,7 @@ class GitLab(BaseClient):
     def getBranchesProtectionRules(self, projectId):
         logger.debug("Getting branch protection rules")
 
-        status_code, response = self.__paginatedGet(f"{self._gitlabURL}/api/v4/projects/{projectId}/protected_branches")
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{projectId}/protected_branches")
 
         if status_code == 403:
             raise GitLabError(response.get("message"))
@@ -610,9 +596,7 @@ class GitLab(BaseClient):
     def getBranches(self, projectId):
         logger.debug("Getting branch protection rules (limited)")
 
-        status_code, response = self.__paginatedGet(
-            f"{self._gitlabURL}/api/v4/projects/{projectId}/repository/branches"
-        )
+        status_code, response = self.__paginatedGet(f"{self.url}/api/v4/projects/{projectId}/repository/branches")
 
         if status_code == 403:
             raise GitLabError(response.get("message"))
@@ -632,7 +616,7 @@ class GitLab(BaseClient):
     def getProject(self, projectId):
         logger.debug("Getting project: {projectId}")
 
-        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}")
+        response = self.session.get(f"{self.url}/api/v4/projects/{projectId}")
 
         if response.status_code != 200:
             raise GitLabError(response.json().get("message"))
@@ -641,7 +625,7 @@ class GitLab(BaseClient):
 
     def getFailureReasonPipeline(self, projectId, pipelineId):
 
-        response = self._session.get(f"{self._gitlabURL}/api/v4/projects/{projectId}/pipelines/{pipelineId}").json()
+        response = self.session.get(f"{self.url}/api/v4/projects/{projectId}/pipelines/{pipelineId}").json()
 
         return response.get("yaml_errors", None)
 

@@ -82,5 +82,5 @@ def test_add_repo_raises_on_bad_credentials():
 def test_repos_is_per_instance_not_shared():
     a = _make_client()
     b = _make_client()
-    a._repos.append("x")
+    a.repos.append("x")
     assert b.repos == []

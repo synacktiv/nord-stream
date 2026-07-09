@@ -21,8 +21,8 @@ class GitHub(BaseClient):
     def __init__(self, token):
         super().__init__(token)
         self._auth = ("foo", token)
-        self._org = None
-        self._repos = []
+        self.org = None
+        self.repos = []
         self._isGHSToken = token.lower().startswith("ghs_")
         self._githubLogin = self.__getLogin()
 
@@ -37,34 +37,22 @@ class GitHub(BaseClient):
 
         return requests.post("https://api.github.com/graphql", headers=headers, json=data).status_code == 200
 
-    @property
-    def org(self):
-        return self._org
-
-    @org.setter
-    def org(self, org):
-        self._org = org
-
-    @property
-    def repos(self):
-        return self._repos
-
     def __getLogin(self):
         return self.getLoginWithGraphQL().json().get("data").get("viewer").get("login")
 
     def getUser(self):
         logger.debug("Retrieving user informations")
-        return self._session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header)
+        return self.session.get(f"https://api.github.com/user", auth=self._auth, headers=self._header)
 
     def getLoginWithGraphQL(self):
         logger.debug("Retrieving identity with GraphQL")
 
         headers = self._header
-        headers["Authorization"] = f"token {self._token}"
+        headers["Authorization"] = f"token {self.token}"
 
         data = {"query": "query UserCurrent{viewer{login}}"}
 
-        return self._session.post("https://api.github.com/graphql", headers=headers, json=data)
+        return self.session.post("https://api.github.com/graphql", headers=headers, json=data)
 
     def __paginatedGet(self, url, data="", maxData=0):
 
@@ -74,7 +62,7 @@ class GitHub(BaseClient):
 
             params = {"page": page}
 
-            response = self._session.get(
+            response = self.session.get(
                 url,
                 params=params,
                 auth=self._auth,
@@ -108,7 +96,7 @@ class GitHub(BaseClient):
         logger.debug("Listing repos")
 
         if self._isGHSToken:
-            url = f"https://api.github.com/orgs/{self._org}/repos"
+            url = f"https://api.github.com/orgs/{self.org}/repos"
         else:
             url = f"https://api.github.com/user/repos"
 
@@ -116,16 +104,16 @@ class GitHub(BaseClient):
 
         for repo in response:
             # filter for specific org
-            if self._org:
-                if self._org.lower() == repo.get("owner").get("login").lower():
-                    self._repos.append(repo.get("full_name"))
+            if self.org:
+                if self.org.lower() == repo.get("owner").get("login").lower():
+                    self.repos.append(repo.get("full_name"))
             else:
-                self._repos.append(repo.get("full_name"))
+                self.repos.append(repo.get("full_name"))
 
     def addRepo(self, repo):
         logger.debug(f"Checking repo: {repo}")
-        if self._org:
-            full_name = self._org + "/" + repo
+        if self.org:
+            full_name = self.org + "/" + repo
         else:
             # if no org, must provide repo as 'org/repo'
             # FIXME: This cannot happen at the moment because --org argument is required
@@ -135,7 +123,7 @@ class GitHub(BaseClient):
                 # FIXME: Raise an Exception here
                 logger.error("Invalid repo name: {repo}")
 
-        response = self._session.get(
+        response = self.session.get(
             f"{self._repoURL}/{full_name}",
             auth=self._auth,
             headers=self._header,
@@ -145,7 +133,7 @@ class GitHub(BaseClient):
             raise GitHubBadCredentials(response.get("message"))
 
         if response.get("id"):
-            self._repos.append(response.get("full_name"))
+            self.repos.append(response.get("full_name"))
 
     def listEnvFromrepo(self, repo):
         logger.debug(f"Listing environment secret from repo: {repo}")
@@ -201,7 +189,7 @@ class GitHub(BaseClient):
     def listDependabotOrganizationSecrets(self):
         res = []
 
-        response = self.__paginatedGet(f"https://api.github.com/orgs/{self._org}/dependabot/secrets", data="secrets")
+        response = self.__paginatedGet(f"https://api.github.com/orgs/{self.org}/dependabot/secrets", data="secrets")
 
         for sec in response:
             res.append(sec.get("name"))
@@ -212,7 +200,7 @@ class GitHub(BaseClient):
         logger.debug("Getting environment protections")
         envReq = urllib.parse.quote(env, safe="")
         res = []
-        response = self._session.get(
+        response = self.session.get(
             f"{self._repoURL}/{repo}/environments/{envReq}",
             auth=self._auth,
             headers=self._header,
@@ -226,7 +214,7 @@ class GitHub(BaseClient):
 
     def getEnvDetails(self, repo, env):
         envReq = urllib.parse.quote(env, safe="")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._repoURL}/{repo}/environments/{envReq}",
             auth=self._auth,
             headers=self._header,
@@ -238,10 +226,10 @@ class GitHub(BaseClient):
 
     def createDeploymentBranchPolicy(self, repo, env):
         envReq = urllib.parse.quote(env, safe="")
-        logger.debug(f"Adding new branch policy for {self._branchName} on {envReq}")
+        logger.debug(f"Adding new branch policy for {self.branchName} on {envReq}")
 
-        data = {"name": f"{self._branchName}"}
-        response = self._session.post(
+        data = {"name": f"{self.branchName}"}
+        response = self.session.post(
             f"{self._repoURL}/{repo}/environments/{envReq}/deployment-branch-policies",
             json=data,
             auth=self._auth,
@@ -258,24 +246,24 @@ class GitHub(BaseClient):
     def deleteDeploymentBranchPolicy(self, repo, env):
         logger.debug("Delete deployment branch policy")
         envReq = urllib.parse.quote(env, safe="")
-        response = self._session.get(
+        response = self.session.get(
             f"{self._repoURL}/{repo}/environments/{envReq}",
             auth=self._auth,
             headers=self._header,
         ).json()
 
         if response.get("deployment_branch_policy") is not None:
-            response = self._session.get(
+            response = self.session.get(
                 f"{self._repoURL}/{repo}/environments/{envReq}/deployment-branch-policies",
                 auth=self._auth,
                 headers=self._header,
             ).json()
 
             for policy in response.get("branch_policies"):
-                if policy.get("name").lower() == self._branchName.lower():
-                    logger.verbose(f"Deleting branch policy for {self._branchName} on {envReq}")
+                if policy.get("name").lower() == self.branchName.lower():
+                    logger.verbose(f"Deleting branch policy for {self.branchName} on {envReq}")
                     policyId = policy.get("id")
-                    self._session.delete(
+                    self.session.delete(
                         f"{self._repoURL}/{repo}/environments/{envReq}/deployment-branch-policies/{policyId}",
                         auth=self._auth,
                         headers=self._header,
@@ -283,8 +271,8 @@ class GitHub(BaseClient):
 
     def disableBranchProtectionRules(self, repo):
         logger.debug("Modifying branch protection")
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}",
+        response = self.session.get(
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self.branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -298,8 +286,8 @@ class GitHub(BaseClient):
                 "allow_deletions": True,
                 "allow_force_pushes": True,
             }
-            self._session.put(
-                f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
+            self.session.put(
+                f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self.branchName)}/protection",
                 json=data,
                 auth=self._auth,
                 headers=self._header,
@@ -312,7 +300,7 @@ class GitHub(BaseClient):
             "deployment_branch_policy": branchPolicy,
         }
         envReq = urllib.parse.quote(env, safe="")
-        response = self._session.put(
+        response = self.session.put(
             f"{self._repoURL}/{repo}/environments/{envReq}",
             json=data,
             auth=self._auth,
@@ -329,8 +317,8 @@ class GitHub(BaseClient):
             self.deleteDeploymentBranchPolicy(repo, env)
 
     def checkBranchProtectionRules(self, repo):
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}",
+        response = self.session.get(
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self.branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -340,8 +328,8 @@ class GitHub(BaseClient):
 
     def getBranchesProtectionRules(self, repo):
         logger.debug("Getting branch protection rules")
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
+        response = self.session.get(
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self.branchName)}/protection",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -352,8 +340,8 @@ class GitHub(BaseClient):
     def updateBranchesProtectionRules(self, repo, protections):
         logger.debug("Updating branch protection rules")
 
-        response = self._session.put(
-            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self._branchName)}/protection",
+        response = self.session.put(
+            f"{self._repoURL}/{repo}/branches/{urllib.parse.quote(self.branchName)}/protection",
             auth=self._auth,
             headers=self._header,
             json=protections,
@@ -363,14 +351,14 @@ class GitHub(BaseClient):
 
     def cleanDeploymentsLogs(self, repo):
         logger.verbose(f"Cleaning deployment logs from: {repo}")
-        url = f"{self._repoURL}/{repo}/deployments?ref={urllib.parse.quote(self._branchName)}"
+        url = f"{self._repoURL}/{repo}/deployments?ref={urllib.parse.quote(self.branchName)}"
         response = self.__paginatedGet(url, maxData=200)
 
         for deployment in response:
             if not self._isGHSToken and deployment.get("creator").get("login").lower() != self._githubLogin.lower():
                 continue
 
-            commit = self._session.get(
+            commit = self.session.get(
                 f"{self._repoURL}/{repo}/commits/{deployment['sha']}", auth=self._auth, headers=self._header
             ).json()
 
@@ -386,13 +374,13 @@ class GitHub(BaseClient):
 
             deploymentId = deployment.get("id")
             data = {"state": "inactive"}
-            self._session.post(
+            self.session.post(
                 f"{self._repoURL}/{repo}/deployments/{deploymentId}/statuses",
                 json=data,
                 auth=self._auth,
                 headers=self._header,
             )
-            self._session.delete(
+            self.session.delete(
                 f"{self._repoURL}/{repo}/deployments/{deploymentId}",
                 auth=self._auth,
                 headers=self._header,
@@ -400,7 +388,7 @@ class GitHub(BaseClient):
 
     def cleanRunLogs(self, repo, workflowFilename):
         logger.verbose(f"Cleaning run logs from: {repo}")
-        url = f"{self._repoURL}/{repo}/actions/runs?branch={urllib.parse.quote(self._branchName)}"
+        url = f"{self._repoURL}/{repo}/actions/runs?branch={urllib.parse.quote(self.branchName)}"
 
         if not self._isGHSToken:
             url += f"&actor={self._githubLogin.lower()}"
@@ -423,7 +411,7 @@ class GitHub(BaseClient):
 
             runId = run.get("id")
             status = (
-                self._session.get(
+                self.session.get(
                     f"{self._repoURL}/{repo}/actions/runs/{runId}",
                     json={},
                     auth=self._auth,
@@ -434,14 +422,14 @@ class GitHub(BaseClient):
             )
 
             if status != "completed":
-                self._session.post(
+                self.session.post(
                     f"{self._repoURL}/{repo}/actions/runs/{runId}/cancel",
                     json={},
                     auth=self._auth,
                     headers=self._header,
                 )
                 status = (
-                    self._session.get(
+                    self.session.get(
                         f"{self._repoURL}/{repo}/actions/runs/{runId}",
                         json={},
                         auth=self._auth,
@@ -454,7 +442,7 @@ class GitHub(BaseClient):
                     for i in range(self._maxRetry):
                         time.sleep(2)
                         status = (
-                            self._session.get(
+                            self.session.get(
                                 f"{self._repoURL}/{repo}/actions/runs/{runId}",
                                 json={},
                                 auth=self._auth,
@@ -466,12 +454,12 @@ class GitHub(BaseClient):
                         if status == "completed":
                             break
 
-            self._session.delete(
+            self.session.delete(
                 f"{self._repoURL}/{repo}/actions/runs/{runId}/logs",
                 auth=self._auth,
                 headers=self._header,
             )
-            self._session.delete(
+            self.session.delete(
                 f"{self._repoURL}/{repo}/actions/runs/{runId}",
                 auth=self._auth,
                 headers=self._header,
@@ -484,15 +472,15 @@ class GitHub(BaseClient):
 
     def createWorkflowOutputDir(self, repo):
         outputName = repo.split("/")
-        makedirs(f"{self._outputDir}/{outputName[0]}/{outputName[1]}", exist_ok=True)
+        makedirs(f"{self.outputDir}/{outputName[0]}/{outputName[1]}", exist_ok=True)
 
     def waitWorkflow(self, repo, workflowFilename):
         logger.info("Getting workflow output")
 
         time.sleep(5)
         workflowFilename = urllib.parse.quote_plus(workflowFilename)
-        response = self._session.get(
-            f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
+        response = self.session.get(
+            f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self.branchName)}",
             auth=self._auth,
             headers=self._header,
         ).json()
@@ -501,8 +489,8 @@ class GitHub(BaseClient):
             for i in range(self._maxRetry):
                 logger.warning(f"Workflow not started, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
-                response = self._session.get(
-                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
+                response = self.session.get(
+                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self.branchName)}",
                     auth=self._auth,
                     headers=self._header,
                 ).json()
@@ -516,8 +504,8 @@ class GitHub(BaseClient):
             for i in range(self._maxRetry):
                 logger.warning(f"Workflow not finished, sleeping for {self._sleepTime}s")
                 time.sleep(self._sleepTime)
-                response = self._session.get(
-                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self._branchName)}",
+                response = self.session.get(
+                    f"{self._repoURL}/{repo}/actions/workflows/{workflowFilename}/runs?branch={urllib.parse.quote(self.branchName)}",
                     auth=self._auth,
                     headers=self._header,
                 ).json()
@@ -534,27 +522,27 @@ class GitHub(BaseClient):
     def downloadWorkflowOutput(self, repo, name, workflowId):
         self.createWorkflowOutputDir(repo)
 
-        zipFile = self._session.get(
+        zipFile = self.session.get(
             f"{self._repoURL}/{repo}/actions/runs/{workflowId}/logs",
             auth=self._auth,
             headers=self._header,
         )
 
         date = time.strftime("%Y-%m-%d_%H-%M-%S")
-        with open(f"{self._outputDir}/{repo}/workflow_{name}_{date}.zip", "wb") as f:
+        with open(f"{self.outputDir}/{repo}/workflow_{name}_{date}.zip", "wb") as f:
             f.write(zipFile.content)
         f.close()
         return f"workflow_{name}_{date}.zip"
 
     def getFailureReason(self, repo, workflowId):
         res = []
-        workflow = self._session.get(
+        workflow = self.session.get(
             f"{self._repoURL}/{repo}/actions/runs/{workflowId}",
             auth=self._auth,
             headers=self._header,
         ).json()
         checkSuiteId = workflow.get("check_suite_id")
-        checkRuns = self._session.get(
+        checkRuns = self.session.get(
             f"{self._repoURL}/{repo}/check-suites/{checkSuiteId}/check-runs",
             auth=self._auth,
             headers=self._header,
@@ -563,7 +551,7 @@ class GitHub(BaseClient):
         if checkRuns.get("total_count"):
             for checkRun in checkRuns.get("check_runs"):
                 checkRunId = checkRun.get("id")
-                annotations = self._session.get(
+                annotations = self.session.get(
                     f"{self._repoURL}/{repo}/check-runs/{checkRunId}/annotations",
                     auth=self._auth,
                     headers=self._header,
@@ -574,13 +562,13 @@ class GitHub(BaseClient):
 
     def filterWriteRepos(self):
         res = []
-        for repo in self._repos:
+        for repo in self.repos:
             try:
                 self.listSecretsFromRepo(repo)
                 res.append(repo)
             except GitHubError:
                 pass
-        self._repos = res
+        self.repos = res
 
     def isGHSToken(self):
         return self._isGHSToken
