@@ -68,20 +68,15 @@ from docopt import docopt
 from nordstream.cicd.devops import DevOps
 from nordstream.core.devops.devops import DevOpsRunner
 from nordstream.git import Git
-from nordstream.utils.log import NordStreamLog, logger
+from nordstream.utils.log import logger
 from nordstream.utils.devops import listOrgs
+from nordstream.cli.common import configureVerbosity, configureGitIdentity
 
 
 def start(argv):
     args = docopt(__doc__, argv=argv)
 
-    if args["--verbose"]:
-        NordStreamLog.setVerbosity(verbose=1)
-
-    if args["--debug"]:
-        NordStreamLog.setVerbosity(verbose=2)
-
-    logger.debug(args)
+    configureVerbosity(args)
 
     if args["--list-orgs"]:
         listOrgs(args["--token"])
@@ -108,12 +103,7 @@ def start(argv):
 
     devopsRunner = DevOpsRunner(devops)
 
-    if args["--key-id"]:
-        Git.KEY_ID = args["--key-id"]
-    if args["--user"]:
-        Git.USER = args["--user"]
-    if args["--email"]:
-        Git.EMAIL = args["--email"]
+    configureGitIdentity(args)
     if args["--pipeline-file"]:
         devopsRunner.pipelineFilename = args["--pipeline-file"]
     if args["--yaml"]:

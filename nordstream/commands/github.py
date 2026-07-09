@@ -66,19 +66,15 @@ Authors: @hugow @0hexit
 from docopt import docopt
 from nordstream.cicd.github import GitHub
 from nordstream.core.github.github import GitHubWorkflowRunner
-from nordstream.utils.log import logger, NordStreamLog
+from nordstream.utils.log import logger
 from nordstream.git import Git
+from nordstream.cli.common import configureVerbosity, configureGitIdentity
 
 
 def start(argv):
     args = docopt(__doc__, argv=argv)
 
-    if args["--verbose"]:
-        NordStreamLog.setVerbosity(verbose=1)
-    if args["--debug"]:
-        NordStreamLog.setVerbosity(verbose=2)
-
-    logger.debug(args)
+    configureVerbosity(args)
 
     # check validity of the token
     if not GitHub.checkToken(args["--token"]):
@@ -94,12 +90,7 @@ def start(argv):
         gitHub.branchName = args["--branch-name"]
         logger.info(f'Using branch: "{gitHub.branchName}"')
 
-    if args["--key-id"]:
-        Git.KEY_ID = args["--key-id"]
-    if args["--user"]:
-        Git.USER = args["--user"]
-    if args["--email"]:
-        Git.EMAIL = args["--email"]
+    configureGitIdentity(args)
 
     # runner setup
     gitHubWorkflowRunner = GitHubWorkflowRunner(gitHub, args["--env"])

@@ -58,19 +58,15 @@ Authors: @hugow @0hexit
 from docopt import docopt
 from nordstream.cicd.gitlab import GitLab
 from nordstream.core.gitlab.gitlab import GitLabRunner
-from nordstream.utils.log import logger, NordStreamLog
+from nordstream.utils.log import logger
 from nordstream.git import Git
+from nordstream.cli.common import configureVerbosity, configureGitIdentity
 
 
 def start(argv):
     args = docopt(__doc__, argv=argv)
 
-    if args["--verbose"]:
-        NordStreamLog.setVerbosity(verbose=1)
-    if args["--debug"]:
-        NordStreamLog.setVerbosity(verbose=2)
-
-    logger.debug(args)
+    configureVerbosity(args)
 
     # check validity of the token
     if not GitLab.checkToken(args["--token"], args["--url"], (not args["--ignore-cert"])):
@@ -82,12 +78,7 @@ def start(argv):
         gitlab.outputDir = args["--output-dir"] + "/"
     gitLabRunner = GitLabRunner(gitlab)
 
-    if args["--key-id"]:
-        Git.KEY_ID = args["--key-id"]
-    if args["--user"]:
-        Git.USER = args["--user"]
-    if args["--email"]:
-        Git.EMAIL = args["--email"]
+    configureGitIdentity(args)
 
     if args["--branch-name"]:
         gitlab.branchName = args["--branch-name"]
