@@ -8,3 +8,4 @@ build/
 nord-stream-logs/
 notes.md
 .vscode
+nord_stream.egg-info/
