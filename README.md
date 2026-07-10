@@ -10,10 +10,12 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
 
 - [Nord Stream](#nord-stream)
   - [Table of Contents](#table-of-contents)
+  - [Features](#features)
   - [Installation](#installation)
   - [Usage](#usage)
     - [Shared arguments](#shared-arguments)
       - [Describe token](#describe-token)
+      - [Enumeration](#enumeration)
       - [Build YAML](#build-yaml)
       - [YAML](#yaml)
       - [Clean logs](#clean-logs)
@@ -21,6 +23,7 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
     - [Azure DevOps](#azure-devops)
       - [Service connections](#service-connections)
         - [SSH](#ssh)
+      - [Self-hosted agents and pools](#self-hosted-agents-and-pools)
       - [Listing orgs](#listing-orgs)
       - [Help](#help)
     - [GitHub](#github)
@@ -32,11 +35,50 @@ Find out more in the following blogpost: https://www.synacktiv.com/publications/
       - [Help](#help-1)
     - [GitLab](#gitlab)
       - [List secrets](#list-secrets)
+      - [List runners](#list-runners)
       - [YAML](#yaml-1)
       - [List protections](#list-protections-1)
       - [Help](#help-2)
+  - [Development](#development)
   - [TODO](#todo)
   - [Contact](#contact)
+
+## Features
+
+Nord Stream deploys _malicious_ pipelines to extract secrets stored in CI/CD
+environments, and can also enumerate a lot of the surrounding configuration.
+
+**Supported platforms:** Azure DevOps, GitHub, GitLab.
+
+**Secret extraction**
+
+| Platform | What can be extracted |
+|---|---|
+| **GitHub** | Repository, environment and organization Actions secrets; Azure & AWS **OIDC** access tokens |
+| **Azure DevOps** | Variable groups, secure files, and service connections (**AzureRM**, **GitHub**, **AWS**, **SonarQube**, **SSH**) |
+| **GitLab** | Project / group / instance CI/CD variables, project secure files, and (for low-privileged users) environment variables via a deployed pipeline |
+
+**Enumeration** — depending on the platform and your privileges:
+
+- Describe the current token (`--describe-token`)
+- List repositories/projects, secrets, users, and (GitLab) runners
+- List DevOps organizations reachable from a token (`devops --list-orgs`)
+- List branch/environment protection rules (`--list-protections`)
+
+**Deployment & stealth**
+
+- Build a pipeline file without deploying it (`--build-yaml`) or deploy an
+  arbitrary custom pipeline (`--yaml`)
+- Temporarily disable and then restore branch/environment protections
+  (`--disable-protections`), or ignore them entirely (`--force`, GitHub)
+- Sign commits with a GPG key to bypass required-signature protections
+  (`--key-id` / `--user` / `--email`)
+- Automatic log/branch cleanup after deployment (`--no-clean` to keep logs)
+- Target self-hosted agents/pools on Azure DevOps (`--pool-name`, `--os`,
+  `--default-agent`)
+
+> Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) if you'd
+> like to add a new platform, service-connection type, or extraction technique.
 
 ## Installation
 
@@ -45,6 +87,9 @@ $ pipx install git+https://github.com/synacktiv/nord-stream
 ```
 
 `git` is also required (see https://git-scm.com/download/) and must exist in your `PATH`.
+
+To install from source for development (editable install with the test
+dependencies), see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Usage
 
@@ -101,6 +146,33 @@ $ nord-stream github --token "$PAT" --describe-token
         - Bio: None
 
 ```
+
+#### Enumeration
+
+Before (or instead of) deploying anything, Nord Stream can enumerate the target.
+The available listing options depend on the platform:
+
+| Option | GitHub | Azure DevOps | GitLab |
+|---|:---:|:---:|:---:|
+| `--list-secrets` | ✅ | ✅ | ✅ |
+| `--list-repos` / `--list-projects` | `--list-repos` | `--list-projects` | `--list-projects` |
+| `--list-repositories` | | ✅ | |
+| `--list-groups` | | | ✅ |
+| `--list-users` | | ✅ | ✅ |
+| `--list-runners` | | | ✅ |
+| `--list-protections` | ✅ | | ✅ |
+| `--list-orgs` | | ✅ | |
+
+For example, list every project you can reach and the secrets defined in them:
+
+```bash
+$ nord-stream devops --token "$PAT" --org myorg --list-projects
+$ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --list-users
+```
+
+The `--write-filter` option restricts the results to repositories/projects where
+the current user has write (or higher) access — useful to quickly find where a
+pipeline can actually be deployed.
 
 #### Build YAML
 
@@ -275,6 +347,23 @@ If you need to run this on a windows self-hosted runner, in the `generatePipelin
 
 Note: for both Windows and Linux self-hosted runners, you need to adapt the path (`/home/vsts/work/_tasks/` or `D:\a\`) to match the path where the runner is deployed. This information can be obtained in the `Capabilities` tab of an agent on Azure DevOps.
 
+#### Self-hosted agents and pools
+
+When a pipeline must run on a specific pool or on a self-hosted agent, you can
+control how the generated pipeline targets it:
+
+- `--pool-name <name>` sets the `pool` name in the generated YAML.
+- `--default-agent <name>` sets the *Default agent* pool used for the pipeline.
+- `--os <linux|windows>` selects the agent OS the pipeline is written for
+  (defaults to `linux`).
+
+```bash
+$ nord-stream devops --token "$PAT" --org myorg --build-yaml pipeline.yml --pool-name "Self-Hosted" --os windows
+```
+
+You can also change the on-disk pipeline filename with
+`--pipeline-file <filename>` (defaults to `azure-pipelines.yml`).
+
 #### Listing orgs
 
 With an access token it's possible to list the organizations bound to a user:
@@ -293,13 +382,15 @@ $ nord-stream devops -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --repo-name <name>]
-    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>]
+    nord-stream devops [options] --token <pat> --org <org> [extraction] [--project <project> --write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name> --pool-name <name> --os <os> --default-agent <name> --sleep <int>]
+    nord-stream devops [options] --token <pat> --org <org> --yaml <yaml> --project <project> [--write-filter --no-clean --branch-name <name> --pipeline-name <name> --pipeline-file <filename> --repo-name <name> --sleep <int>]
+    nord-stream devops [options] --token <pat> --org <org> --build-yaml <output> [--build-type <type>] [--pool-name <name>] [--os linux|windows]
     nord-stream devops [options] --token <pat> --org <org> --clean-logs [--project <project>]
     nord-stream devops [options] --token <pat> --org <org> --list-projects [--write-filter]
+    nord-stream devops [options] --token <pat> --org <org> --list-repositories [--project <project>]
     nord-stream devops [options] --token <pat> --org <org> (--list-secrets [--project <project> --write-filter] | --list-users)
     nord-stream devops [options] --token <pat> --org <org> --describe-token
+    nord-stream devops [options] --token <pat> --list-orgs
 
 Options:
     -h --help                               Show this screen.
@@ -322,6 +413,7 @@ args:
     --clean-logs                            Delete all pipeline created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
     --list-projects                         List all projects.
+    --list-repositories                     List all repositories.
     --list-secrets                          List all secrets.
     --list-users                            List all users.
     --write-filter                          Filter projects where current user has write or admin access.
@@ -330,7 +422,12 @@ args:
     --describe-token                        Display information on the token
     --branch-name <name>                    Use specific branch name for deployment.
     --pipeline-name <name>                  Use pipeline for deployment.
+    --pipeline-file <filename>              Pipeline filename (default: azure-pipelines.yml).
     --repo-name <name>                      Use specific repo for deployment.
+    --pool-name <name>                      Use specific pool name for deployment. This value will be set as pool name in the YAML file
+    --default-agent <name>                  Use specific default agent pool for deployment. This value will be used as Default agent pool for the pipeline
+    --os [linux | windows]                  The agent's OS where the pipeline will be run. Default to linux
+    --sleep <int>                           Sleep this amount of time before retrieving pipeline result (15s by default)
 
 Exctraction:
     --extract <list>                        Extract following secrets [vg,sf,gh,az,aws,sonar,ssh]
@@ -506,13 +603,13 @@ $ nord-stream github -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
-    nord-stream github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> [--repo <repo> --no-repo --no-env --no-org --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --yaml <yaml> --repo <repo> [--env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream github [options] --token <ghp> --org <org> ([--clean-logs] [--clean-branch-policy]) [--repo <repo> --branch-name <name>]
-    nord-stream github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--env <env>]
-    nord-stream github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--azure-subscription-id <subscription> --repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
+    nord-stream github [options] --token <ghp> --org <org> --build-yaml <filename> --repo <repo> [--build-type <type> --env <env>]
+    nord-stream github [options] --token <ghp> --org <org> --azure-tenant-id <tenant> --azure-client-id <client> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
     nord-stream github [options] --token <ghp> --org <org> --aws-role <role> --aws-region <region> [--repo <repo> --env <env> --disable-protections --branch-name <name> --no-clean]
-    nord-stream github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections (--key-id <id> --user <user> --email <email>)]
+    nord-stream github [options] --token <ghp> --org <org> --list-protections [--repo <repo> --branch-name <name> --disable-protections]
     nord-stream github [options] --token <ghp> --org <org> --list-secrets [--repo <repo> --no-repo --no-env --no-org]
     nord-stream github [options] --token <ghp> [--org <org>] --list-repos [--write-filter]
     nord-stream github [options] --token <ghp> --describe-token
@@ -524,12 +621,12 @@ Options:
     -d, --debug                             Debug mode
     --output-dir <dir>                      Output directory for logs
 
-Signing:
-    --key-id <id>                           GPG primary key ID
-    --user <user>                           User used to sign commits
-    --email <email>                         Email address used to sign commits
+Commit:
+    --user <user>                           User used to commit
+    --email <email>                         Email address used commit
+    --key-id <id>                           GPG primary key ID to sign commits
 
-args
+args:
     --token <ghp>                           Github personal token
     --org <org>                             Org name
     -r, --repo <repo>                       Run on selected repo (can be a file)
@@ -538,6 +635,7 @@ args
     --no-clean                              Don't clean workflow logs (default false)
     --clean-branch-policy                   Remove branch policy, can be used with --repo. This operation is done by default but can be manually triggered.
     --build-yaml <filename>                 Create a pipeline yaml file with all secrets.
+    --build-type <type>                     Type used to generate the yaml file can be: default, azureoidc, awsoidc
     --env <env>                             Specify env for the yaml file creation.
     --no-repo                               Don't extract repo secrets.
     --no-env                                Don't extract environnments secrets.
@@ -593,6 +691,20 @@ deploy-production:
 
 GitLab also support secure files like Azure DevOps. Secure files are defined at the project level. Like the variables It's not possible to list the secure files without admin access to the project. However, with admin access nord-stream will try to exfiltrate the secure files related to the projects.
 
+#### List runners
+
+The `--list-runners` option enumerates GitLab runners by inspecting the jobs of
+the projects you can access. It works from an **unprivileged** account (no admin
+rights required), though it is therefore **non-exhaustive** — it only sees
+runners that have executed a job on a reachable project. For each runner it
+reports the scope, executor, status, tags, platform and associated projects:
+
+```bash
+$ nord-stream gitlab --token "$TOKEN" --url https://gitlab.local --list-runners
+```
+
+You can also enumerate users with `--list-users`.
+
 #### YAML
 
 Same as [YAML](#yaml), however you need to provide the full project path like this:
@@ -613,9 +725,9 @@ $ nord-stream gitlab -h
 CICD pipeline exploitation tool
 
 Usage:
-    nord-stream gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter]
-    nord-stream gitlab [options] --token <pat> ( --list-groups | --list-projects ) [--project <project> --group <group> --write-filter]
-    nord-stream gitlab [options] --token <pat> --yaml <yaml> --project <project> [--no-clean]
+    nord-stream gitlab [options] --token <pat> (--list-secrets | --list-protections) [--project <project> --group <group> --no-project --no-group --no-instance --write-filter --sleep <seconds>]
+    nord-stream gitlab [options] --token <pat> ( --list-groups | --list-projects | --list-users | --list-runners) [--project <project> --group <group> --write-filter]
+    nord-stream gitlab [options] --token <pat> --yaml <yaml> --project <project> [--project-path <path> --no-clean]
     nord-stream gitlab [options] --token <pat> --clean-logs [--project <project>]
     nord-stream gitlab [options] --token <pat> --describe-token
 
@@ -627,6 +739,7 @@ Options:
     --output-dir <dir>                      Output directory for logs
     --url <gitlab_url>                      Gitlab URL [default: https://gitlab.com]
     --ignore-cert                           Allow insecure server connections
+    --membership                            Limit by projects that the current user is a member of
 
 Commit:
     --user <user>                           User used to commit
@@ -635,12 +748,14 @@ Commit:
 
 args:
     --token <pat>                           GitLab personal access token or _gitlab_session cookie
-    --project <project>                     Run on selected project (can be a file)
+    --project <project>                     Run on selected project (can be a file / project id)
     --group <group>                         Run on selected group (can be a file)
     --list-secrets                          List all secrets.
     --list-protections                      List branch protection rules.
     --list-projects                         List all projects.
     --list-groups                           List all groups.
+    --list-users                            List all users.
+    --list-runners                          List runners through project jobs (unprivileged, but non-exhaustive).
     --write-filter                          Filter repo where current user has developer access or more.
     --no-project                            Don't extract project secrets.
     --no-group                              Don't extract group secrets.
@@ -650,6 +765,8 @@ args:
     --clean-logs                            Delete all pipeline logs created by this tool. This operation is done by default but can be manually triggered.
     --no-clean                              Don't clean pipeline logs (default false)
     --describe-token                        Display information on the token
+    --sleep <seconds>                       Time to sleep in seconds between each secret request.
+    --project-path <path>                   Local path of the git folder.
 
 Examples:
     Dump all secrets
@@ -660,6 +777,21 @@ Examples:
 
 Authors: @hugow @0hexit
 ```
+
+## Development
+
+Nord Stream is organised into single-responsibility layers (CLI → orchestration
+→ HTTP clients → parsers → display), with shared base classes for the clients
+and runners, and an offline test suite (`pytest`, HTTP mocked with `responses`).
+
+```bash
+pip install -e '.[dev]'
+pytest
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full setup, the project
+architecture, the code style (Black, line length 120), the Conventional Commits
+convention, and the pre-commit hooks.
 
 ## TODO
 
