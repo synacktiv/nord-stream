@@ -347,15 +347,34 @@ class DevOpsRunner:
 
     @staticmethod
     def __doubleb64(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
+        # The injected step prints the secrets on a single double-base64 line,
+        # but its position in the log depends on the task type: Bash@3 (variable
+        # groups) ends with the payload at [-3], while AzureCLI@2 (service
+        # connections) appends an `az account clear` teardown line that shifts it
+        # to [-4]. Scan backwards and decode the first line that yields a payload
+        # instead of assuming a fixed index.
+        for line in reversed(output.readlines()):
+            field = line.split(b" ")
+            if len(field) < 2:
+                continue
+            # readlines() keeps the trailing newline, so strip it off the token
+            # before validating (validate=True rejects the stray whitespace).
+            token = field[1].strip()
+            if not token:
+                continue
+            try:
+                # validate=True: otherwise non-base64 characters in ordinary log
+                # lines are dropped and "decode" into garbage instead of raising.
+                data = base64.b64decode(base64.b64decode(token, validate=True), validate=True)
+            except Exception:
+                continue
+            if data.strip():
+                return data
+        return None
 
     @staticmethod
     def __azureRm(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
+        return DevOpsRunner.__doubleb64(output)
 
     def __launchPipeline(self, project, pipelineId, pipelineGenerator):
         logger.verbose(f"Launching pipeline.")
