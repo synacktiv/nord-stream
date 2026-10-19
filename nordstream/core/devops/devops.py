@@ -302,7 +302,9 @@ class DevOpsRunner:
         elif pipelineType == "ssh":
             pipelineGenerator.generatePipelineForSSH("#FIXME", self._poolName, self._os)
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self._poolName, self._os)
+            pipelineGenerator.generatePipelineForSecretExtraction(
+                {"name": "", "variables": ""}, self._poolName, self._os
+            )
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
