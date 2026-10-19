@@ -313,6 +313,7 @@ class DevOpsRunner:
             f"{self._cicd.outputDir}/{self._cicd.org}/{projectId}/{self._fileName}",
             "rb",
         ) as output:
+            pipelineResults = None
             try:
                 if resType == self._resType["doubleb64"]:
                     pipelineResults = self.__doubleb64(output)
@@ -323,8 +324,16 @@ class DevOpsRunner:
                 elif resType == self._resType["default"]:
                     pipelineResults = output.read()
                 else:
-                    logger.exception("Invalid type checkout: _resType")
-            except:
+                    logger.error("Invalid type checkout: _resType")
+            except Exception as e:
+                logger.error(f"Could not decode the pipeline output: {e}")
+
+            if not (pipelineResults and pipelineResults.strip()):
+                # Decoding produced nothing. An empty double-base64 line decodes
+                # to b"" without raising, so this path used to fall through and
+                # write an empty result while reporting success. Treat it as a
+                # failure: warn and keep the raw log so the payload is not lost.
+                logger.warning("Could not decode a payload from the pipeline log; keeping the raw log instead.")
                 output.seek(0)
                 pipelineResults = output.read()
 
