@@ -302,7 +302,9 @@ class DevOpsRunner:
         elif pipelineType == "ssh":
             pipelineGenerator.generatePipelineForSSH("#FIXME", self._poolName, self._os)
         else:
-            pipelineGenerator.generatePipelineForSecretExtraction({"name": "", "variables": ""}, self._poolName, self._os)
+            pipelineGenerator.generatePipelineForSecretExtraction(
+                {"name": "", "variables": ""}, self._poolName, self._os
+            )
 
         logger.success("YAML file: ")
         pipelineGenerator.displayYaml()
@@ -313,6 +315,7 @@ class DevOpsRunner:
             f"{self._cicd.outputDir}/{self._cicd.org}/{projectId}/{self._fileName}",
             "rb",
         ) as output:
+            pipelineResults = None
             try:
                 if resType == self._resType["doubleb64"]:
                     pipelineResults = self.__doubleb64(output)
@@ -323,8 +326,16 @@ class DevOpsRunner:
                 elif resType == self._resType["default"]:
                     pipelineResults = output.read()
                 else:
-                    logger.exception("Invalid type checkout: _resType")
-            except:
+                    logger.error("Invalid type checkout: _resType")
+            except Exception as e:
+                logger.error(f"Could not decode the pipeline output: {e}")
+
+            if not (pipelineResults and pipelineResults.strip()):
+                # Decoding produced nothing. An empty double-base64 line decodes
+                # to b"" without raising, so this path used to fall through and
+                # write an empty result while reporting success. Treat it as a
+                # failure: warn and keep the raw log so the payload is not lost.
+                logger.warning("Could not decode a payload from the pipeline log; keeping the raw log instead.")
                 output.seek(0)
                 pipelineResults = output.read()
 
@@ -347,15 +358,34 @@ class DevOpsRunner:
 
     @staticmethod
     def __doubleb64(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
+        # The injected step prints the secrets on a single double-base64 line,
+        # but its position in the log depends on the task type: Bash@3 (variable
+        # groups) ends with the payload at [-3], while AzureCLI@2 (service
+        # connections) appends an `az account clear` teardown line that shifts it
+        # to [-4]. Scan backwards and decode the first line that yields a payload
+        # instead of assuming a fixed index.
+        for line in reversed(output.readlines()):
+            field = line.split(b" ")
+            if len(field) < 2:
+                continue
+            # readlines() keeps the trailing newline, so strip it off the token
+            # before validating (validate=True rejects the stray whitespace).
+            token = field[1].strip()
+            if not token:
+                continue
+            try:
+                # validate=True: otherwise non-base64 characters in ordinary log
+                # lines are dropped and "decode" into garbage instead of raising.
+                data = base64.b64decode(base64.b64decode(token, validate=True), validate=True)
+            except Exception:
+                continue
+            if data.strip():
+                return data
+        return None
 
     @staticmethod
     def __azureRm(output):
-        # well it's working
-        data = output.readlines()[-3].split(b" ")[1]
-        return base64.b64decode(base64.b64decode(data))
+        return DevOpsRunner.__doubleb64(output)
 
     def __launchPipeline(self, project, pipelineId, pipelineGenerator):
         logger.verbose(f"Launching pipeline.")
